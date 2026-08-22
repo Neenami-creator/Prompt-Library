@@ -797,7 +797,7 @@ export default function PromptLibrary() {
             onClick={() => avatarInputRef.current?.click()}
             aria-label="Change profile photo"
           >
-            <img src={`/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
+            <img src={`/api/icon/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
           </button>
           <div>
             <strong>Nina</strong>
@@ -883,7 +883,7 @@ export default function PromptLibrary() {
             </p>
           </div>
           <div className="hero-avatar avatar-crop" aria-hidden="true">
-            <img src={`/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
+            <img src={`/api/icon/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
           </div>
           <div className="hero-orbit orbit-one" aria-hidden="true" />
           <div className="hero-orbit orbit-two" aria-hidden="true" />
