@@ -89,51 +89,122 @@ const labels: Record<string, string> = {
   uncategorised: "Uncategorised",
 };
 
-const glyphs: Record<string, string> = {
-  all: "✦",
-  favorites: "★",
-  essentials: "⚡",
-  work: "▣",
-  analysis: "◫",
-  writing: "✎",
-  dashboard: "⌁",
-  image: "◇",
-  video: "▶",
-  branding: "◉",
-  social: "◎",
-  claude: "C",
-  productivity: "✓",
-  automation: "↻",
-  uncategorised: "·",
-};
-
 /**
- * Illustrated icon art (from /public/icons) used purely for decoration
- * throughout the UI. Every place these render is already accompanied by
- * visible text or is wrapped in aria-hidden markup, so this mapping never
- * changes what a screen reader announces — it only adds a visual identity
- * on top of the existing labels.
+ * The library's ~40 raw category values are grouped into a small set of
+ * main categories, each expandable into its real subcategories. This is a
+ * purely presentational grouping — the underlying `prompt.category` value
+ * is never rewritten, so nothing about the data changes, only how it is
+ * browsed.
  */
-const categoryIconArt: Record<string, string> = {
-  all: "/icons/my-library.webp",
-  favorites: "/icons/favourites.webp",
-  essentials: "/icons/essentials.webp",
-  work: "/icons/work.webp",
-  analysis: "/icons/ai-tools.webp",
-  writing: "/icons/writing.webp",
-  dashboard: "/icons/categories.webp",
-  image: "/icons/images.webp",
-  video: "/icons/video.webp",
-  branding: "/icons/ai-settings.webp",
-  social: "/icons/personal.webp",
-  claude: "/icons/coding.webp",
-  productivity: "/icons/productivity.webp",
-  automation: "/icons/recently-added.webp",
-  uncategorised: "/icons/constellation.webp",
+type CategoryGroup = {
+  key: string;
+  label: string;
+  accent: string;
+  members: string[];
 };
 
-function iconFor(category: string) {
-  return categoryIconArt[category] ?? "/icons/constellation.webp";
+const categoryGroups: CategoryGroup[] = [
+  { key: "essentials", label: "Essentials", accent: "#c8a94b", members: ["essentials"] },
+  {
+    key: "writing",
+    label: "Writing & Editing",
+    accent: "#a15170",
+    members: [
+      "writing",
+      "writing & editing",
+      "editing & rewriting",
+      "reports & summaries",
+      "thought leadership & executive communications",
+      "email & launch copywriting",
+    ],
+  },
+  {
+    key: "image",
+    label: "Image & Design",
+    accent: "#b46a3b",
+    members: [
+      "image",
+      "image generation & editing",
+      "design & visual content",
+      "character design & visual consistency",
+      "product marketing & infographic design",
+    ],
+  },
+  {
+    key: "branding",
+    label: "Branding & Creative",
+    accent: "#8b6b20",
+    members: ["branding", "branding & logo strategy", "creative direction & visual strategy"],
+  },
+  {
+    key: "video",
+    label: "Video & Media",
+    accent: "#8a4aa5",
+    members: [
+      "video",
+      "video & media production",
+      "video & animation",
+      "product video & storyboarding",
+      "faceless youtube strategy",
+    ],
+  },
+  {
+    key: "business",
+    label: "Business & Analysis",
+    accent: "#2f688e",
+    members: [
+      "work",
+      "analysis",
+      "personal finance & money management",
+      "faceless business & ai monetisation",
+      "ai monetisation & side hustles",
+    ],
+  },
+  {
+    key: "marketing",
+    label: "Marketing & Web",
+    accent: "#b23e6b",
+    members: [
+      "social",
+      "website strategy & conversion",
+      "research, ux & content strategy",
+      "ux, cro & information architecture",
+    ],
+  },
+  {
+    key: "tech",
+    label: "Tech & AI Tools",
+    accent: "#b25f43",
+    members: [
+      "claude cowork & file workflows",
+      "claude",
+      "software planning & engineering",
+      "software engineering & code quality",
+      "app building & saas development",
+      "automation",
+      "document analysis & intelligence",
+      "personal ai & content systems",
+    ],
+  },
+  {
+    key: "productivity",
+    label: "Productivity & Home",
+    accent: "#4d7c46",
+    members: ["productivity", "dashboard", "home"],
+  },
+];
+
+const groupByCategory: Record<string, string> = {};
+for (const group of categoryGroups) {
+  for (const member of group.members) groupByCategory[member] = group.key;
+}
+
+function groupKeyFor(rawCategory: string) {
+  return groupByCategory[rawCategory] ?? "other";
+}
+
+function groupFor(groupKey: string) {
+  return categoryGroups.find((group) => group.key === groupKey);
 }
 
 const categoryAccents: Record<string, string> = {
@@ -202,6 +273,8 @@ export default function PromptLibrary() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [directoryGroup, setDirectoryGroup] = useState<string | null>(null);
   const [libraryView, setLibraryView] = useState<LibraryView>("prompts");
   const [sort, setSort] = useState("featured");
   const [selected, setSelected] = useState<Prompt | null>(null);
@@ -211,7 +284,10 @@ export default function PromptLibrary() {
   const [mobileNav, setMobileNav] = useState(false);
   const [toast, setToast] = useState("");
   const [greeting, setGreeting] = useState(() => getAdelaideGreeting(new Date()));
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const browseRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -263,6 +339,12 @@ export default function PromptLibrary() {
     });
   }, [prompts]);
 
+  const activeGroupCount = useMemo(
+    () => categoryGroups.filter((group) => categories.some((item) => groupKeyFor(item) === group.key))
+      .length,
+    [categories],
+  );
+
   const counts = useMemo(() => {
     const result: Record<string, number> = {
       all: prompts.length,
@@ -280,7 +362,9 @@ export default function PromptLibrary() {
       const matchesCategory =
         category === "all" ||
         (category === "favorites" && prompt.favorite) ||
-        prompt.category === category;
+        (category.startsWith("group:")
+          ? groupKeyFor(prompt.category) === category.slice(6)
+          : prompt.category === category);
       if (!matchesCategory) return false;
       if (libraryView === "featured" && !prompt.featured) return false;
       if (!term) return true;
@@ -325,6 +409,65 @@ export default function PromptLibrary() {
     );
   }
 
+  function toggleGroup(groupKey: string) {
+    setExpandedGroup((current) => (current === groupKey ? null : groupKey));
+  }
+
+  function resizeImageToDataUrl(file: File, maxEdge: number, quality: number) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("That photo could not be read."));
+      reader.onload = () => {
+        const img = new window.Image();
+        img.onerror = () => reject(new Error("That file is not a readable image."));
+        img.onload = () => {
+          const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+          const width = Math.max(1, Math.round(img.width * scale));
+          const height = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          if (!context) {
+            reject(new Error("Image processing is not available in this browser."));
+            return;
+          }
+          context.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setToast("Choose an image file.");
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 720, 0.9);
+      const response = await fetch("/api/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl }),
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) throw new Error(data.error || "The photo could not be saved.");
+      setAvatarVersion((value) => value + 1);
+      setToast("Photo updated");
+    } catch (caught) {
+      setToast(caught instanceof Error ? caught.message : "The photo could not be saved.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
   function openAllPrompts() {
     setCategory("all");
     setSearch("");
@@ -336,6 +479,7 @@ export default function PromptLibrary() {
 
   function openCategoryDirectory() {
     setLibraryView("categories");
+    setDirectoryGroup(null);
     window.requestAnimationFrame(() =>
       browseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
@@ -564,19 +708,74 @@ export default function PromptLibrary() {
 
         <nav className="category-nav" aria-label="Prompt categories">
           <div className="nav-label">LIBRARY</div>
-          {["all", "favorites", ...categories].map((item) => (
-            <button
-              key={item}
-              className={category === item ? "active" : ""}
-              onClick={() => selectCategory(item)}
-            >
-              <span className="nav-glyph" aria-hidden="true">
-                <img src={iconFor(item)} alt="" width={26} height={26} loading="lazy" />
-              </span>
-              <span>{labels[item] ?? titleCaseCategory(item)}</span>
-              <b>{counts[item] ?? 0}</b>
-            </button>
-          ))}
+          <button
+            className={category === "all" ? "active" : ""}
+            onClick={() => selectCategory("all")}
+          >
+            <span>All prompts</span>
+            <b>{counts.all ?? 0}</b>
+          </button>
+          <button
+            className={category === "favorites" ? "active" : ""}
+            onClick={() => selectCategory("favorites")}
+          >
+            <span>Favourites</span>
+            <b>{counts.favorites ?? 0}</b>
+          </button>
+
+          <div className="nav-label nav-label-groups">CATEGORIES</div>
+          {categoryGroups.map((group) => {
+            const groupCategories = categories.filter((item) => groupKeyFor(item) === group.key);
+            if (!groupCategories.length) return null;
+            const groupCount = groupCategories.reduce((sum, item) => sum + (counts[item] ?? 0), 0);
+
+            if (groupCategories.length === 1) {
+              const only = groupCategories[0];
+              return (
+                <button
+                  key={group.key}
+                  className={`nav-solo-group ${category === only ? "active" : ""}`}
+                  style={{ "--accent": group.accent } as CSSProperties}
+                  onClick={() => selectCategory(only)}
+                >
+                  <span className="nav-group-dot" aria-hidden="true" />
+                  <span>{group.label}</span>
+                  <b>{groupCount}</b>
+                </button>
+              );
+            }
+
+            const isExpanded = expandedGroup === group.key;
+            return (
+              <div className={`nav-group ${isExpanded ? "is-expanded" : ""}`} key={group.key}>
+                <button
+                  className="nav-group-header"
+                  style={{ "--accent": group.accent } as CSSProperties}
+                  onClick={() => toggleGroup(group.key)}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="nav-group-dot" aria-hidden="true" />
+                  <span>{group.label}</span>
+                  <b>{groupCount}</b>
+                  <span className="nav-chevron" aria-hidden="true">⌄</span>
+                </button>
+                {isExpanded && (
+                  <div className="nav-subcategories">
+                    {groupCategories.map((item) => (
+                      <button
+                        key={item}
+                        className={category === item ? "active" : ""}
+                        onClick={() => selectCategory(item)}
+                      >
+                        <span>{titleCaseCategory(item)}</span>
+                        <b>{counts[item] ?? 0}</b>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-audit">
@@ -592,14 +791,33 @@ export default function PromptLibrary() {
         </div>
 
         <div className="profile">
-          <div className="profile-avatar avatar-crop" aria-hidden="true">
-            <img src="/neen-avatar.jpg" alt="" />
-          </div>
+          <button
+            type="button"
+            className="profile-avatar avatar-crop"
+            onClick={() => avatarInputRef.current?.click()}
+            aria-label="Change profile photo"
+          >
+            <img src={`/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
+          </button>
           <div>
             <strong>Nina</strong>
             <small>Mission Commander</small>
+            <button
+              type="button"
+              className="avatar-change-link"
+              onClick={() => avatarInputRef.current?.click()}
+            >
+              {avatarUploading ? "Uploading…" : "Change photo"}
+            </button>
           </div>
         </div>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={uploadAvatar}
+        />
       </aside>
 
       {mobileNav && (
@@ -665,37 +883,43 @@ export default function PromptLibrary() {
             </p>
           </div>
           <div className="hero-avatar avatar-crop" aria-hidden="true">
-            <img src="/neen-avatar.jpg" alt="" />
+            <img src={`/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
           </div>
           <div className="hero-orbit orbit-one" aria-hidden="true" />
           <div className="hero-orbit orbit-two" aria-hidden="true" />
-          <div className="hero-float" aria-hidden="true">
-            <span className="hero-float-chip chip-a">
-              <img src="/icons/writing.webp" alt="" loading="lazy" />
-            </span>
-            <span className="hero-float-chip chip-b">
-              <img src="/icons/images.webp" alt="" loading="lazy" />
-            </span>
-            <span className="hero-float-chip chip-c">
-              <img src="/icons/coding.webp" alt="" loading="lazy" />
-            </span>
-          </div>
         </section>
 
         <section className="category-links" aria-label="Quick category links">
-          {["all", "favorites", ...categories].map((item) => (
-            <button
-              key={item}
-              className={category === item ? "active" : ""}
-              onClick={() => selectCategory(item)}
-            >
-              <span className="icon-tile" aria-hidden="true">
-                <img src={iconFor(item)} alt="" width={34} height={34} loading="lazy" />
-              </span>
-              <strong>{labels[item] ?? titleCaseCategory(item)}</strong>
-              <small>{counts[item] ?? 0}</small>
-            </button>
-          ))}
+          <button
+            className={category === "all" ? "active" : ""}
+            onClick={() => selectCategory("all")}
+          >
+            <strong>All prompts</strong>
+            <small>{counts.all ?? 0}</small>
+          </button>
+          <button
+            className={category === "favorites" ? "active" : ""}
+            onClick={() => selectCategory("favorites")}
+          >
+            <strong>Favourites</strong>
+            <small>{counts.favorites ?? 0}</small>
+          </button>
+          {categoryGroups.map((group) => {
+            const groupCategories = categories.filter((item) => groupKeyFor(item) === group.key);
+            if (!groupCategories.length) return null;
+            const groupCount = groupCategories.reduce((sum, item) => sum + (counts[item] ?? 0), 0);
+            return (
+              <button
+                key={group.key}
+                className={category === `group:${group.key}` ? "active" : ""}
+                onClick={() => selectCategory(`group:${group.key}`)}
+                style={{ "--accent": group.accent } as CSSProperties}
+              >
+                <strong>{group.label}</strong>
+                <small>{groupCount}</small>
+              </button>
+            );
+          })}
         </section>
 
         <section className="library-heading">
@@ -713,9 +937,6 @@ export default function PromptLibrary() {
               onClick={openAllPrompts}
               aria-label={`Open all ${prompts.length} prompts`}
             >
-              <span className="icon-tile" aria-hidden="true">
-                <img src="/icons/my-library.webp" alt="" width={30} height={30} loading="lazy" />
-              </span>
               <strong>{prompts.length}</strong>
               <span>prompts</span>
               <small>View all ›</small>
@@ -724,12 +945,9 @@ export default function PromptLibrary() {
               type="button"
               className={libraryView === "categories" ? "active" : ""}
               onClick={openCategoryDirectory}
-              aria-label={`Open the clickable list of ${categories.length} categories`}
+              aria-label={`Open the clickable list of ${activeGroupCount} categories`}
             >
-              <span className="icon-tile" aria-hidden="true">
-                <img src="/icons/categories.webp" alt="" width={30} height={30} loading="lazy" />
-              </span>
-              <strong>{categories.length}</strong>
+              <strong>{activeGroupCount}</strong>
               <span>categories</span>
               <small>Browse ›</small>
             </button>
@@ -739,9 +957,6 @@ export default function PromptLibrary() {
               onClick={openFeaturedPrompts}
               aria-label={`Open ${featuredCount} featured prompts`}
             >
-              <span className="icon-tile" aria-hidden="true">
-                <img src="/icons/featured.webp" alt="" width={30} height={30} loading="lazy" />
-              </span>
               <strong>{featuredCount}</strong>
               <span>featured</span>
               <small>View picks ›</small>
@@ -755,32 +970,72 @@ export default function PromptLibrary() {
               <div className="directory-heading">
                 <div>
                   <p className="eyebrow">BROWSE YOUR LIBRARY</p>
-                  <h2 id="category-directory-title">Categories</h2>
-                  <p>Choose a category to see every prompt filed inside it.</p>
+                  <h2 id="category-directory-title">
+                    {directoryGroup ? groupFor(directoryGroup)?.label ?? "Categories" : "Categories"}
+                  </h2>
+                  <p>
+                    {directoryGroup
+                      ? "Choose a subcategory to see every prompt filed inside it."
+                      : "Choose a category to see every prompt filed inside it."}
+                  </p>
                 </div>
-                <button className="secondary-button" onClick={openAllPrompts}>
-                  View all prompts
-                </button>
+                {directoryGroup ? (
+                  <button className="secondary-button" onClick={() => setDirectoryGroup(null)}>
+                    ‹ All categories
+                  </button>
+                ) : (
+                  <button className="secondary-button" onClick={openAllPrompts}>
+                    View all prompts
+                  </button>
+                )}
               </div>
               <div className="category-directory-grid">
-                {categories.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => selectCategory(item)}
-                    style={{ "--accent": accentFor(item) } as CSSProperties}
-                  >
-                    <span className="icon-tile directory-glyph" aria-hidden="true">
-                      <img src={iconFor(item)} alt="" width={52} height={52} loading="lazy" />
-                    </span>
-                    <span>
-                      <strong>{labels[item] ?? titleCaseCategory(item)}</strong>
-                      <small>
-                        {counts[item] ?? 0} {(counts[item] ?? 0) === 1 ? "prompt" : "prompts"}
-                      </small>
-                    </span>
-                    <b aria-hidden="true">›</b>
-                  </button>
-                ))}
+                {directoryGroup
+                  ? categories
+                      .filter((item) => groupKeyFor(item) === directoryGroup)
+                      .map((item) => (
+                        <button
+                          key={item}
+                          onClick={() => selectCategory(item)}
+                          style={{ "--accent": accentFor(item) } as CSSProperties}
+                        >
+                          <span>
+                            <strong>{titleCaseCategory(item)}</strong>
+                            <small>
+                              {counts[item] ?? 0} {(counts[item] ?? 0) === 1 ? "prompt" : "prompts"}
+                            </small>
+                          </span>
+                          <b aria-hidden="true">›</b>
+                        </button>
+                      ))
+                  : categoryGroups
+                      .filter((group) => categories.some((item) => groupKeyFor(item) === group.key))
+                      .map((group) => {
+                        const groupCategories = categories.filter(
+                          (item) => groupKeyFor(item) === group.key,
+                        );
+                        const groupCount = groupCategories.reduce(
+                          (sum, item) => sum + (counts[item] ?? 0),
+                          0,
+                        );
+                        return (
+                          <button
+                            key={group.key}
+                            onClick={() => setDirectoryGroup(group.key)}
+                            style={{ "--accent": group.accent } as CSSProperties}
+                          >
+                            <span>
+                              <strong>{group.label}</strong>
+                              <small>
+                                {groupCount} {groupCount === 1 ? "prompt" : "prompts"} ·{" "}
+                                {groupCategories.length}{" "}
+                                {groupCategories.length === 1 ? "subcategory" : "subcategories"}
+                              </small>
+                            </span>
+                            <b aria-hidden="true">›</b>
+                          </button>
+                        );
+                      })}
               </div>
             </section>
           ) : (
@@ -791,9 +1046,7 @@ export default function PromptLibrary() {
                   onClick={() => spotlightPrompt && setSelected(spotlightPrompt)}
                   disabled={!spotlightPrompt}
                 >
-                  <span className="icon-tile mission-band-icon" aria-hidden="true">
-                    <img src="/icons/featured.webp" alt="" width={44} height={44} loading="lazy" />
-                  </span>
+                  <span className="mission-band-star" aria-hidden="true">★</span>
                   <span>
                     <small>NEEN&apos;S PICK</small>
                     <strong>{spotlightPrompt?.title ?? "Guided Prompt Builder"}</strong>
@@ -886,31 +1139,19 @@ export default function PromptLibrary() {
                       onClick={() => setSelected(prompt)}
                       onKeyDown={(event) => handleCardKey(event, prompt)}
                     >
-                      <div className="card-art" aria-hidden="true">
-                        <img
-                          className="card-art-watermark"
-                          src={iconFor(prompt.category)}
-                          alt=""
-                          loading="lazy"
-                        />
-                        {prompt.featured && (
-                          <span className="card-featured-flag">
-                            <img src="/icons/featured.webp" alt="" loading="lazy" />
-                          </span>
-                        )}
+                      <div
+                        className="card-art"
+                        aria-hidden="true"
+                        style={{ "--accent": accentFor(prompt.category) } as CSSProperties}
+                      >
+                        {prompt.featured && <span className="card-featured-flag">★ Featured</span>}
                       </div>
                       <div className="card-body">
                         <div className="card-topline">
-                          <span className="category-pill">
-                            <span className="icon-tile" aria-hidden="true">
-                              <img
-                                src={iconFor(prompt.category)}
-                                alt=""
-                                width={18}
-                                height={18}
-                                loading="lazy"
-                              />
-                            </span>
+                          <span
+                            className="category-pill"
+                            style={{ "--accent": accentFor(prompt.category) } as CSSProperties}
+                          >
                             {titleCaseCategory(prompt.category)}
                           </span>
                           <button
@@ -953,9 +1194,7 @@ export default function PromptLibrary() {
                 </section>
               ) : (
                 <section className="empty-state">
-                  <span aria-hidden="true">
-                    <img src="/icons/search.webp" alt="" width={40} height={40} loading="lazy" />
-                  </span>
+                  <span className="empty-state-mark" aria-hidden="true">⌕</span>
                   <h2>No prompts match that search</h2>
                   <p>Try a broader phrase or choose another category.</p>
                   <button
@@ -992,16 +1231,10 @@ export default function PromptLibrary() {
           >
             <header>
               <div>
-                <span className="category-pill">
-                  <span className="icon-tile" aria-hidden="true">
-                    <img
-                      src={iconFor(selected.category)}
-                      alt=""
-                      width={18}
-                      height={18}
-                      loading="lazy"
-                    />
-                  </span>
+                <span
+                  className="category-pill"
+                  style={{ "--accent": accentFor(selected.category) } as CSSProperties}
+                >
                   {titleCaseCategory(selected.category)}
                 </span>
                 <h2 id="prompt-detail-title">{selected.title}</h2>
@@ -1098,10 +1331,14 @@ export default function PromptLibrary() {
                   value={form.category}
                   onChange={(event) => setForm({ ...form, category: event.target.value })}
                 >
-                  {categoryOrder.map((item) => (
-                    <option value={item} key={item}>
-                      {titleCaseCategory(item)}
-                    </option>
+                  {categoryGroups.map((group) => (
+                    <optgroup label={group.label} key={group.key}>
+                      {group.members.map((item) => (
+                        <option value={item} key={item}>
+                          {titleCaseCategory(item)}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>
