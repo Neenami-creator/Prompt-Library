@@ -1,0 +1,18 @@
+{
+  "note": "sha256 of files sealed at export. Run `npm run reseal` after intentional edits.",
+  "files": {
+    "app/globals.css": "fa3cf98097eaf30182d00a7f23e2bfb9a27d398baec71b1769fcfbc20f681dd1",
+    "app/prompt-library.tsx": "2e293e2130c5a5892eef5aa684566354f5186aad1f3ce3ea92a88709a3de7a63",
+    "app/layout.tsx": "c8ca0ee7221e54652a099a0f55bf31160d08cd520760467034a0fe32372e8c52",
+    "app/page.tsx": "3a59ce0f83dadc2a185f382b0e41985655015453b2cf36baa43eb319b50b396b",
+    "app/api/prompts/route.ts": "3794b13d0631b99187a8ad7b83127ebdd79d7fef16bf21698813007e9970679d",
+    "app/api/seed/route.ts": "6df5771a1f57b7d0f0f12d82fa7444abfeb2e4f730f1e1c33d7ce793633bc796",
+    "app/api/icon/[file]/route.ts": "40cd245981ceed5b5a57e951ad0b9bc2488177643a15ca90c4f0b8b8fed9ddc4",
+    "lib/supabase.ts": "04c8a1f40ee8c1a6a3ea0c2c3f767517bab47330755019f6de025613d12ce40f",
+    "lib/australian-english.ts": "87c82d36d1dfacec8855e2575f57fe53971cfbd37a3e7f7fd7b6987484e7016f",
+    "next.config.ts": "b74dadaa07e1104e648bcc553819c9b99d4116db643897caf2ab7fd68080d485",
+    "postcss.config.mjs": "dfac7ac2d86d326a0e5adb024e7943c181393ed17a5fcb8f0315b24c7da6ddde",
+    "tsconfig.json": "81f0aa4d1b85baaf7d65f8c6949d7f55a6c234a4bce00a1ce349362dea87ca8f",
+    "public/favicon.svg": "e6d2e59b7b5bbb0342e0fb496dfc262decbfe4426bbb7b047aec8d467d1dc6f7"
+  }
+}
