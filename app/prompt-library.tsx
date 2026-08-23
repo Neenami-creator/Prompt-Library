@@ -10,6 +10,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  buildMatcher,
+  DUPLICATE_THRESHOLD,
+  REVIEW_THRESHOLD,
+  type OverlapMatch,
+} from "@/lib/similarity";
 
 type Prompt = {
   id: string;
@@ -46,6 +52,32 @@ type PromptForm = {
 };
 
 type LibraryView = "prompts" | "categories" | "featured";
+
+type IncomingPrompt = {
+  title: string;
+  category: string;
+  tags: string[];
+  description: string;
+  promptText: string;
+  aliases: string[];
+  favorite: boolean;
+};
+
+type ReviewDecision = "add" | "update" | "skip";
+
+/**
+ * One incoming prompt, paired with whatever it looks like in the existing
+ * library and what will happen to it if the import is confirmed as-is.
+ */
+type ReviewItem = {
+  key: number;
+  incoming: IncomingPrompt;
+  matches: OverlapMatch[];
+  decision: ReviewDecision;
+  targetId: string | null;
+  /** True when an existing prompt carries this exact title. */
+  titleClash: boolean;
+};
 
 const emptyForm: PromptForm = {
   title: "",
@@ -286,6 +318,8 @@ export default function PromptLibrary() {
   const [greeting, setGreeting] = useState(() => getAdelaideGreeting(new Date()));
   const [avatarVersion, setAvatarVersion] = useState(0);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [review, setReview] = useState<ReviewItem[] | null>(null);
+  const [applying, setApplying] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const browseRef = useRef<HTMLElement>(null);
@@ -646,6 +680,12 @@ export default function PromptLibrary() {
     setToast("Markdown export downloaded");
   }
 
+  /**
+   * Reads an import file and checks every prompt in it against the library
+   * before anything is written. Nothing is saved here — the result is a review
+   * list the user confirms, so a near-duplicate can be merged into the prompt
+   * it duplicates instead of quietly becoming a second copy of it.
+   */
   async function importJson(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -653,29 +693,137 @@ export default function PromptLibrary() {
     try {
       const parsed = JSON.parse(await file.text()) as Partial<Prompt>[];
       if (!Array.isArray(parsed)) throw new Error("The JSON must contain a prompt array.");
-      let imported = 0;
-      for (const item of parsed.slice(0, 200)) {
-        if (!item.title?.trim() || !item.promptText?.trim()) continue;
-        const response = await fetch("/api/prompts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: item.title,
-            category: item.category || "uncategorised",
-            tags: item.tags || [],
-            description: item.description || "",
-            promptText: item.promptText,
-            aliases: item.aliases || [],
-            favorite: Boolean(item.favorite),
-            source: "Imported into prompt library",
-          }),
+
+      const match = buildMatcher(
+        prompts.map((item) => ({
+          id: item.id,
+          title: item.title,
+          category: item.category,
+          description: item.description,
+          promptText: item.promptText,
+        })),
+      );
+      const byTitle = new Map(
+        prompts.map((item) => [item.title.trim().toLowerCase(), item.id]),
+      );
+
+      const items: ReviewItem[] = [];
+      let skipped = 0;
+      for (const entry of parsed.slice(0, 200)) {
+        if (!entry.title?.trim() || !entry.promptText?.trim()) {
+          skipped += 1;
+          continue;
+        }
+        const incoming: IncomingPrompt = {
+          title: entry.title.trim(),
+          category: entry.category?.trim().toLowerCase() || "uncategorised",
+          tags: Array.isArray(entry.tags) ? entry.tags.map(String) : [],
+          description: entry.description?.trim() || "",
+          promptText: entry.promptText.trim(),
+          aliases: Array.isArray(entry.aliases) ? entry.aliases.map(String) : [],
+          favorite: Boolean(entry.favorite),
+        };
+
+        const matches = match(incoming);
+        const clashId = byTitle.get(incoming.title.toLowerCase()) ?? null;
+        const best = matches[0];
+
+        // A shared title, or a body close enough to be a rewrite, both point at
+        // the same prompt already being filed — default those to an update so a
+        // confirmed import can never silently fork one prompt into two.
+        const shouldUpdate = Boolean(clashId) || (best && best.score >= DUPLICATE_THRESHOLD);
+        items.push({
+          key: items.length,
+          incoming,
+          matches,
+          decision: shouldUpdate ? "update" : "add",
+          targetId: clashId ?? (shouldUpdate && best ? best.id : best?.id ?? null),
+          titleClash: Boolean(clashId),
         });
-        if (response.ok) imported += 1;
       }
-      await loadPrompts();
-      setToast(`${imported} prompt${imported === 1 ? "" : "s"} imported`);
+
+      if (!items.length) {
+        setToast(
+          skipped
+            ? "Every entry was missing a title or prompt text."
+            : "That file contained no prompts.",
+        );
+        return;
+      }
+      setReview(items);
     } catch (caught) {
       setToast(caught instanceof Error ? caught.message : "The import could not be read.");
+    }
+  }
+
+  function setReviewDecision(key: number, decision: ReviewDecision) {
+    setReview((items) =>
+      items?.map((item) =>
+        item.key === key
+          ? {
+              ...item,
+              decision,
+              targetId:
+                decision === "update"
+                  ? item.targetId ?? item.matches[0]?.id ?? null
+                  : item.targetId,
+            }
+          : item,
+      ) ?? null,
+    );
+  }
+
+  function setReviewTarget(key: number, targetId: string) {
+    setReview((items) =>
+      items?.map((item) => (item.key === key ? { ...item, targetId } : item)) ?? null,
+    );
+  }
+
+  /** Writes the confirmed decisions: new prompts created, merges applied over the prompt they matched. */
+  async function applyReview() {
+    if (!review) return;
+    setApplying(true);
+    let added = 0;
+    let updated = 0;
+    let failed = 0;
+    try {
+      for (const item of review) {
+        if (item.decision === "skip") continue;
+        const isUpdate = item.decision === "update" && item.targetId;
+        const response = await fetch("/api/prompts", {
+          method: isUpdate ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(isUpdate ? { id: item.targetId } : {}),
+            title: item.incoming.title,
+            category: item.incoming.category,
+            tags: item.incoming.tags,
+            description: item.incoming.description,
+            promptText: item.incoming.promptText,
+            ...(isUpdate
+              ? { source: "Revised through import review" }
+              : {
+                  aliases: item.incoming.aliases,
+                  favorite: item.incoming.favorite,
+                  source: "Imported into prompt library",
+                }),
+          }),
+        });
+        if (!response.ok) failed += 1;
+        else if (isUpdate) updated += 1;
+        else added += 1;
+      }
+      await loadPrompts();
+      setReview(null);
+      const parts = [];
+      if (added) parts.push(`${added} added`);
+      if (updated) parts.push(`${updated} updated`);
+      if (failed) parts.push(`${failed} failed`);
+      setToast(parts.length ? parts.join(" · ") : "Nothing was changed");
+    } catch {
+      setToast("The import could not be completed.");
+    } finally {
+      setApplying(false);
     }
   }
 
@@ -1381,6 +1529,158 @@ export default function PromptLibrary() {
               </button>
             </footer>
           </form>
+        </div>
+      )}
+
+      {review && (
+        <div className="modal-layer" role="presentation" onMouseDown={() => setReview(null)}>
+          <section
+            className="review-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p className="eyebrow">QUALITY CHECK</p>
+                <h2 id="review-title">Review before importing</h2>
+              </div>
+              <button
+                type="button"
+                className="close-button"
+                aria-label="Close"
+                onClick={() => setReview(null)}
+              >
+                ×
+              </button>
+            </header>
+
+            <p className="review-intro">
+              Each prompt below was compared against all {prompts.length} already in
+              your library. Nothing is saved until you confirm.
+            </p>
+
+            <div className="review-summary">
+              <span className="review-chip review-chip--add">
+                {review.filter((item) => item.decision === "add").length} to add
+              </span>
+              <span className="review-chip review-chip--update">
+                {review.filter((item) => item.decision === "update").length} to update
+              </span>
+              <span className="review-chip review-chip--skip">
+                {review.filter((item) => item.decision === "skip").length} skipped
+              </span>
+            </div>
+
+            <div className="review-list">
+              {review.map((item) => {
+                const best = item.matches[0];
+                const flagged = item.titleClash || (best && best.score >= REVIEW_THRESHOLD);
+                return (
+                  <article
+                    key={item.key}
+                    className={`review-item ${flagged ? "is-flagged" : ""} decision-${item.decision}`}
+                  >
+                    <div className="review-item-head">
+                      <strong>{item.incoming.title}</strong>
+                      <span className="review-category">
+                        {titleCaseCategory(item.incoming.category)}
+                      </span>
+                    </div>
+
+                    {item.incoming.description && (
+                      <p className="review-description">{item.incoming.description}</p>
+                    )}
+
+                    {item.titleClash ? (
+                      <p className="review-flag">
+                        A prompt with this exact title is already in your library.
+                      </p>
+                    ) : best ? (
+                      <p className="review-flag">
+                        {Math.round(best.score * 100)}% similar to{" "}
+                        <b>{best.title}</b>{" "}
+                        <span className="review-muted">
+                          ({titleCaseCategory(best.category)})
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="review-flag review-flag--clear">
+                        No overlap found — this looks new.
+                      </p>
+                    )}
+
+                    <div className="review-actions">
+                      <button
+                        type="button"
+                        className={item.decision === "add" ? "active" : ""}
+                        onClick={() => setReviewDecision(item.key, "add")}
+                      >
+                        Add as new
+                      </button>
+                      <button
+                        type="button"
+                        className={item.decision === "update" ? "active" : ""}
+                        disabled={!item.matches.length}
+                        onClick={() => setReviewDecision(item.key, "update")}
+                      >
+                        Update existing
+                      </button>
+                      <button
+                        type="button"
+                        className={item.decision === "skip" ? "active" : ""}
+                        onClick={() => setReviewDecision(item.key, "skip")}
+                      >
+                        Skip
+                      </button>
+                    </div>
+
+                    {item.decision === "update" && item.matches.length > 1 && (
+                      <label className="review-target">
+                        <span>Replace</span>
+                        <select
+                          value={item.targetId ?? ""}
+                          onChange={(event) => setReviewTarget(item.key, event.target.value)}
+                        >
+                          {item.matches.map((option) => (
+                            <option value={option.id} key={option.id}>
+                              {option.title} — {Math.round(option.score * 100)}%
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+
+                    {item.decision === "update" && (
+                      <p className="review-note">
+                        The matched prompt&apos;s title, text, category and tags will be
+                        replaced with this version.
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+
+            <footer>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setReview(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={applying}
+                onClick={() => void applyReview()}
+              >
+                {applying ? "Applying…" : "Confirm import"}
+              </button>
+            </footer>
+          </section>
         </div>
       )}
 
