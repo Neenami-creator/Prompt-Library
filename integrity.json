@@ -1,8 +1,8 @@
 {
   "note": "sha256 of files sealed at export. Run `npm run reseal` after intentional edits.",
   "files": {
-    "app/globals.css": "aaa5fa1f9b16cccceff6b170278cca0319196860a16e0f5dc17b3dd9e55a2a1e",
-    "app/prompt-library.tsx": "3a6f2a0845db21cc55f2b40598f261b6b6a0a3ff348585c1b1d8767a19c91bd2",
+    "app/globals.css": "6eb2dc58c9b3d485083acda7496888ab889813c3365354b7283b546ccfb364ba",
+    "app/prompt-library.tsx": "808bc51447b6e57725ddec0338d6af06886f512e031013aa59c067e3cda8e460",
     "app/layout.tsx": "c8ca0ee7221e54652a099a0f55bf31160d08cd520760467034a0fe32372e8c52",
     "app/page.tsx": "3a59ce0f83dadc2a185f382b0e41985655015453b2cf36baa43eb319b50b396b",
     "app/api/prompts/route.ts": "3794b13d0631b99187a8ad7b83127ebdd79d7fef16bf21698813007e9970679d",
@@ -16,4 +16,3 @@
     "public/favicon.svg": "e6d2e59b7b5bbb0342e0fb496dfc262decbfe4426bbb7b047aec8d467d1dc6f7"
   }
 }
-
