@@ -313,11 +313,16 @@ export default function PromptLibrary() {
   const [form, setForm] = useState<PromptForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [toast, setToast] = useState("");
   const [greeting, setGreeting] = useState(() => getAdelaideGreeting(new Date()));
   const [avatarVersion, setAvatarVersion] = useState(0);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [profileName, setProfileName] = useState("Nina");
+  const [profileTitle, setProfileTitle] = useState("Mission Commander");
+  const [profileForm, setProfileForm] = useState<{ name: string; title: string } | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [review, setReview] = useState<ReviewItem[] | null>(null);
   const [applying, setApplying] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
@@ -326,6 +331,7 @@ export default function PromptLibrary() {
 
   useEffect(() => {
     void loadPrompts();
+    void loadProfile();
   }, []);
 
   useEffect(() => {
@@ -358,6 +364,52 @@ export default function PromptLibrary() {
       setError(caught instanceof Error ? caught.message : "The library could not load.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadProfile() {
+    try {
+      const response = await fetch("/api/profile");
+      if (!response.ok) return;
+      const data = (await response.json()) as { name?: string; title?: string };
+      if (data.name) setProfileName(data.name);
+      if (data.title) setProfileTitle(data.title);
+    } catch {
+      // Personalisation is optional polish — keep the defaults if this fails.
+    }
+  }
+
+  function openProfileEdit() {
+    setProfileForm({ name: profileName, title: profileTitle });
+  }
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+    if (!profileForm) return;
+    const name = profileForm.name.trim();
+    const title = profileForm.title.trim();
+    if (!name) {
+      setToast("Add a name first.");
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, title }),
+      });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !data.ok) throw new Error(data.error || "The profile could not be saved.");
+      setProfileName(name);
+      setProfileTitle(title || "Mission Commander");
+      setProfileForm(null);
+      setToast("Profile updated");
+    } catch (caught) {
+      setToast(caught instanceof Error ? caught.message : "The profile could not be saved.");
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -424,6 +476,60 @@ export default function PromptLibrary() {
       return Number(b.featured) - Number(a.featured) || a.title.localeCompare(b.title);
     });
   }, [prompts, category, search, sort, libraryView]);
+
+  /**
+   * What the person is actually reaching for, derived entirely from the
+   * copy-count/last-copied data already tracked per prompt — no extra
+   * tracking needed.
+   */
+  const usageStats = useMemo(() => {
+    const totalCopies = prompts.reduce((sum, prompt) => sum + prompt.copyCount, 0);
+    const usedCount = prompts.filter((prompt) => prompt.copyCount > 0).length;
+
+    const topPrompts = [...prompts]
+      .filter((prompt) => prompt.copyCount > 0)
+      .sort((a, b) => b.copyCount - a.copyCount)
+      .slice(0, 8);
+
+    const recentlyUsed = [...prompts]
+      .filter((prompt) => prompt.lastCopiedAt)
+      .sort(
+        (a, b) =>
+          new Date(b.lastCopiedAt as string).getTime() -
+          new Date(a.lastCopiedAt as string).getTime(),
+      )
+      .slice(0, 5);
+
+    const byGroup = new Map<
+      string,
+      { key: string; label: string; accent: string; copies: number }
+    >();
+    for (const prompt of prompts) {
+      if (!prompt.copyCount) continue;
+      const key = groupKeyFor(prompt.category);
+      const group = groupFor(key);
+      const entry = byGroup.get(key) ?? {
+        key,
+        label: group?.label ?? "Other",
+        accent: group?.accent ?? "#7140a6",
+        copies: 0,
+      };
+      entry.copies += prompt.copyCount;
+      byGroup.set(key, entry);
+    }
+    const groupBreakdown = [...byGroup.values()].sort((a, b) => b.copies - a.copies);
+    const maxGroupCopies = groupBreakdown[0]?.copies ?? 0;
+
+    return {
+      totalCopies,
+      usedCount,
+      unusedCount: prompts.length - usedCount,
+      topPrompts,
+      recentlyUsed,
+      groupBreakdown,
+      maxGroupCopies,
+    };
+  }, [prompts]);
 
   const featuredCount = prompts.filter((prompt) => prompt.featured).length;
   const recoveredCount = prompts.filter(
@@ -894,19 +1000,38 @@ export default function PromptLibrary() {
             }
 
             const isExpanded = expandedGroup === group.key;
+            const isGroupActive = category === `group:${group.key}`;
             return (
               <div className={`nav-group ${isExpanded ? "is-expanded" : ""}`} key={group.key}>
-                <button
-                  className="nav-group-header"
+                <div
+                  className={`nav-group-header ${isGroupActive ? "is-active" : ""}`}
                   style={{ "--accent": group.accent } as CSSProperties}
-                  onClick={() => toggleGroup(group.key)}
-                  aria-expanded={isExpanded}
                 >
-                  <span className="nav-group-dot" aria-hidden="true" />
-                  <span>{group.label}</span>
-                  <b>{groupCount}</b>
-                  <span className="nav-chevron" aria-hidden="true">⌄</span>
-                </button>
+                  <button
+                    type="button"
+                    className="nav-group-label"
+                    onClick={() => {
+                      selectCategory(`group:${group.key}`);
+                      setExpandedGroup(group.key);
+                    }}
+                    aria-label={`Show all ${group.label} prompts`}
+                  >
+                    <span className="nav-group-dot" aria-hidden="true" />
+                    <span>{group.label}</span>
+                    <b>{groupCount}</b>
+                  </button>
+                  <button
+                    type="button"
+                    className="nav-chevron-button"
+                    onClick={() => toggleGroup(group.key)}
+                    aria-expanded={isExpanded}
+                    aria-label={
+                      isExpanded ? `Collapse ${group.label} subcategories` : `Expand ${group.label} subcategories`
+                    }
+                  >
+                    <span className="nav-chevron" aria-hidden="true">⌄</span>
+                  </button>
+                </div>
                 {isExpanded && (
                   <div className="nav-subcategories">
                     {groupCategories.map((item) => (
@@ -948,15 +1073,21 @@ export default function PromptLibrary() {
             <img src={`/api/icon/neen-avatar.jpg?v=${avatarVersion}`} alt="" />
           </button>
           <div>
-            <strong>Nina</strong>
-            <small>Mission Commander</small>
-            <button
-              type="button"
-              className="avatar-change-link"
-              onClick={() => avatarInputRef.current?.click()}
-            >
-              {avatarUploading ? "Uploading…" : "Change photo"}
-            </button>
+            <strong>{profileName}</strong>
+            <small>{profileTitle}</small>
+            <div className="profile-links">
+              <button
+                type="button"
+                className="avatar-change-link"
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {avatarUploading ? "Uploading…" : "Change photo"}
+              </button>
+              <span aria-hidden="true">·</span>
+              <button type="button" className="avatar-change-link" onClick={openProfileEdit}>
+                Edit name
+              </button>
+            </div>
           </div>
         </div>
         <input
@@ -995,6 +1126,12 @@ export default function PromptLibrary() {
             <strong>CUSTOM PROMPT LIBRARY</strong>
           </div>
           <div className="top-actions">
+            <span className="topbar-greeting">
+              {greeting}, {profileName}
+            </span>
+            <button className="text-button" onClick={() => setStatsOpen(true)}>
+              Usage stats
+            </button>
             <button className="text-button" onClick={() => setAuditOpen(true)}>
               Consolidation audit
             </button>
@@ -1021,7 +1158,9 @@ export default function PromptLibrary() {
 
         <section className="mission-hero">
           <div className="hero-copy">
-            <p className="hero-greeting">{greeting}, Nina.</p>
+            <p className="hero-greeting">
+              {greeting}, {profileName}.
+            </p>
             <h1>
               Your best thinking,
               <span>ready when you are.</span>
@@ -1439,6 +1578,65 @@ export default function PromptLibrary() {
         </div>
       )}
 
+      {profileForm && (
+        <div className="modal-layer" role="presentation" onMouseDown={() => setProfileForm(null)}>
+          <form
+            className="form-modal form-modal--narrow"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-form-title"
+            onSubmit={saveProfile}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p className="eyebrow">YOUR PROFILE</p>
+                <h2 id="profile-form-title">Make this yours</h2>
+              </div>
+              <button
+                type="button"
+                className="close-button"
+                aria-label="Close"
+                onClick={() => setProfileForm(null)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="form-grid">
+              <label className="wide">
+                <span>Display name</span>
+                <input
+                  value={profileForm.name}
+                  onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })}
+                  placeholder="e.g. Shane"
+                  autoFocus
+                />
+              </label>
+              <label className="wide">
+                <span>Title</span>
+                <input
+                  value={profileForm.title}
+                  onChange={(event) => setProfileForm({ ...profileForm, title: event.target.value })}
+                  placeholder="e.g. Mission Commander"
+                />
+              </label>
+            </div>
+            <p className="profile-form-note">
+              Want a different photo too? Close this and use “Change photo” under your name
+              in the sidebar.
+            </p>
+            <footer>
+              <button type="button" className="secondary-button" onClick={() => setProfileForm(null)}>
+                Cancel
+              </button>
+              <button className="primary-button" disabled={savingProfile}>
+                {savingProfile ? "Saving…" : "Save profile"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+
       {form && (
         <div className="modal-layer" role="presentation" onMouseDown={() => setForm(null)}>
           <form
@@ -1772,6 +1970,140 @@ export default function PromptLibrary() {
             <button className="primary-button full" onClick={exportJson}>
               Download prompt backup
             </button>
+          </aside>
+        </div>
+      )}
+
+      {statsOpen && (
+        <div
+          className="modal-layer audit-layer"
+          role="presentation"
+          onMouseDown={() => setStatsOpen(false)}
+        >
+          <aside
+            className="audit-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="stats-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p className="eyebrow">USAGE STATS</p>
+                <h2 id="stats-title">What you&apos;re actually using</h2>
+              </div>
+              <button className="close-button" onClick={() => setStatsOpen(false)} aria-label="Close">
+                ×
+              </button>
+            </header>
+            <p className="audit-intro">
+              Built from every copy made in this library — the clearest signal of which
+              prompts are earning their place.
+            </p>
+
+            <div className="audit-score">
+              <strong>{usageStats.totalCopies}</strong>
+              <span>total copies made</span>
+            </div>
+
+            <div className="stats-summary-row">
+              <div>
+                <strong>{usageStats.usedCount}</strong>
+                <small>used at least once</small>
+              </div>
+              <div>
+                <strong>{usageStats.unusedCount}</strong>
+                <small>never copied yet</small>
+              </div>
+            </div>
+
+            <h3 className="stats-subheading">Most copied</h3>
+            {usageStats.topPrompts.length ? (
+              <div className="stats-list">
+                {usageStats.topPrompts.map((prompt, index) => (
+                  <button
+                    key={prompt.id}
+                    type="button"
+                    className="stats-row"
+                    onClick={() => {
+                      setStatsOpen(false);
+                      setSelected(prompt);
+                    }}
+                  >
+                    <span className="stats-rank">{index + 1}</span>
+                    <span className="stats-row-body">
+                      <strong>{prompt.title}</strong>
+                      <small>{titleCaseCategory(prompt.category)}</small>
+                    </span>
+                    <b>{prompt.copyCount}×</b>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="stats-empty">
+                Nothing copied yet — start copying prompts and they&apos;ll show up here.
+              </p>
+            )}
+
+            {usageStats.groupBreakdown.length > 0 && (
+              <>
+                <h3 className="stats-subheading">By category</h3>
+                <div className="stats-bars">
+                  {usageStats.groupBreakdown.slice(0, 8).map((group) => (
+                    <div className="stats-bar-row" key={group.key}>
+                      <span>{group.label}</span>
+                      <div className="stats-bar-track">
+                        <div
+                          className="stats-bar-fill"
+                          style={
+                            {
+                              width: `${Math.max(
+                                4,
+                                (group.copies / (usageStats.maxGroupCopies || 1)) * 100,
+                              )}%`,
+                              background: group.accent,
+                            } as CSSProperties
+                          }
+                        />
+                      </div>
+                      <b>{group.copies}</b>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {usageStats.recentlyUsed.length > 0 && (
+              <>
+                <h3 className="stats-subheading">Recently used</h3>
+                <div className="stats-list">
+                  {usageStats.recentlyUsed.map((prompt) => (
+                    <button
+                      key={prompt.id}
+                      type="button"
+                      className="stats-row"
+                      onClick={() => {
+                        setStatsOpen(false);
+                        setSelected(prompt);
+                      }}
+                    >
+                      <span className="stats-row-body">
+                        <strong>{prompt.title}</strong>
+                        <small>
+                          {prompt.lastCopiedAt
+                            ? new Date(prompt.lastCopiedAt).toLocaleDateString("en-AU", {
+                                day: "numeric",
+                                month: "short",
+                              })
+                            : ""}
+                        </small>
+                      </span>
+                      <b>{prompt.copyCount}×</b>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </aside>
         </div>
       )}
