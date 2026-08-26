@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "Custom Prompt Library",
-  title: "Custom Prompt Library",
+  applicationName: "Prompt Library",
+  title: "Prompt Library",
   description:
     "Organise, discover and reuse your best AI prompts.",
   other: {

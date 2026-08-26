@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Prompt Library logo</title>
+  <desc id="desc">Three luminous prompt cards inside a colorful AI constellation orbit.</desc>
+  <defs>
+    <linearGradient id="orbit" x1="31" y1="47" x2="224" y2="211" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#42E8FF"/><stop offset=".47" stop-color="#8B5CFF"/><stop offset=".75" stop-color="#E651FF"/><stop offset="1" stop-color="#FF706D"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="67" y1="67" x2="190" y2="103" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12DDF4"/><stop offset=".48" stop-color="#0878F9"/><stop offset="1" stop-color="#3732C9"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="67" y1="111" x2="190" y2="147" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A75BFF"/><stop offset=".5" stop-color="#7433E8"/><stop offset="1" stop-color="#3C1DBD"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="67" y1="155" x2="190" y2="191" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF6B78"/><stop offset=".5" stop-color="#E83DAE"/><stop offset="1" stop-color="#A821C8"/>
+    </linearGradient>
+    <radialGradient id="nodeCyan" cx=".34" cy=".28" r=".78"><stop stop-color="white"/><stop offset=".28" stop-color="#56F6FF"/><stop offset=".72" stop-color="#00CBE8"/><stop offset="1" stop-color="#1267E8"/></radialGradient>
+    <radialGradient id="nodePurple" cx=".34" cy=".28" r=".78"><stop stop-color="white"/><stop offset=".28" stop-color="#E7A4FF"/><stop offset=".72" stop-color="#A444F1"/><stop offset="1" stop-color="#5C21CB"/></radialGradient>
+    <radialGradient id="nodeCoral" cx=".34" cy=".28" r=".78"><stop stop-color="#FFF8D6"/><stop offset=".3" stop-color="#FFB77F"/><stop offset=".72" stop-color="#FF6576"/><stop offset="1" stop-color="#D82E83"/></radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="soft" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <circle cx="128" cy="128" r="100" stroke="url(#orbit)" stroke-width="5" opacity=".34" filter="url(#glow)"/>
+  <path d="M48 68A100 100 0 0 1 203 53" stroke="url(#orbit)" stroke-width="4" stroke-linecap="round" stroke-dasharray="11 8"/>
+  <path d="M228 125A100 100 0 0 1 62 207" stroke="url(#orbit)" stroke-width="4" stroke-linecap="round" stroke-dasharray="14 7"/>
+  <path d="M32 154A100 100 0 0 1 48 68" stroke="url(#orbit)" stroke-width="4" stroke-linecap="round"/>
+  <g filter="url(#soft)">
+    <rect x="58" y="59" width="140" height="42" rx="21" fill="url(#cyan)" stroke="#8EFAFF" stroke-width="2"/><circle cx="82" cy="80" r="8" fill="url(#nodeCyan)"/><path d="M101 75H168M101 85H148" stroke="#67E8FF" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+    <rect x="58" y="107" width="140" height="42" rx="21" fill="url(#violet)" stroke="#E09BFF" stroke-width="2"/><circle cx="82" cy="128" r="8" fill="url(#nodePurple)"/><path d="M101 123H168M101 133H148" stroke="#C283FF" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+    <rect x="58" y="155" width="140" height="42" rx="21" fill="url(#coral)" stroke="#FF9BC7" stroke-width="2"/><circle cx="82" cy="176" r="8" fill="url(#nodeCoral)"/><path d="M101 171H168M101 181H148" stroke="#FF91D6" stroke-width="5" stroke-linecap="round" opacity=".82"/>
+  </g>
+  <g filter="url(#glow)"><circle cx="48" cy="68" r="13" fill="url(#nodeCyan)" stroke="#A7FBFF" stroke-width="2"/><circle cx="228" cy="125" r="13" fill="url(#nodePurple)" stroke="#F0B5FF" stroke-width="2"/><circle cx="62" cy="207" r="13" fill="url(#nodeCoral)" stroke="#FFD2B0" stroke-width="2"/></g>
+</svg>
