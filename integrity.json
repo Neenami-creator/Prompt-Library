@@ -3,7 +3,7 @@
   "files": {
     "app/globals.css": "f200858543c006062ee320387e852140d000366bb000368042d3c80f235c770e",
     "app/prompt-library.tsx": "0e5012b81eeff7ea3525961001754585d131c1ab694fcb935b4dd48b8dd51ed0",
-    "app/layout.tsx": "0e5e626b7dfa34df9fbf771789314c703564c58751c3243e4724ea690d564b36",
+    "app/layout.tsx": "f2ec44d581c52fe859cfb3f6a6ccce0cddd51599cf4cce65e9c4d250dce26f32",
     "app/page.tsx": "3a59ce0f83dadc2a185f382b0e41985655015453b2cf36baa43eb319b50b396b",
     "app/api/prompts/route.ts": "3794b13d0631b99187a8ad7b83127ebdd79d7fef16bf21698813007e9970679d",
     "app/api/seed/route.ts": "6df5771a1f57b7d0f0f12d82fa7444abfeb2e4f730f1e1c33d7ce793633bc796",
