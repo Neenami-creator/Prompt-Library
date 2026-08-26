@@ -1415,14 +1415,15 @@ export default function PromptLibrary() {
       <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
         <div className="brand-block">
           <Image
-            className="brand-logo"
-            src="/icons/prompt-library-logo.svg"
-            alt="Prompt Library"
+            className="brand-avatar"
+            src={`/api/icon/neen-avatar.jpg?v=${avatarVersion}`}
+            alt=""
             width={56}
             height={56}
             priority
+            unoptimized
           />
-          <div className="brand-title">PROMPT LIBRARY</div>
+          <div className="brand-title">Prompt Library</div>
           <button
             className="sidebar-close"
             onClick={() => setMobileNav(false)}
@@ -1597,19 +1598,20 @@ export default function PromptLibrary() {
           </button>
           <div className="mobile-brand">
             <Image
-              className="mobile-brand-logo"
-              src="/icons/prompt-library-logo.svg"
+              className="mobile-brand-avatar"
+              src={`/api/icon/neen-avatar.jpg?v=${avatarVersion}`}
               alt=""
               width={32}
               height={32}
               priority
+              unoptimized
             />
-            <span>PROMPT LIBRARY</span>
+            <span>Prompt Library</span>
           </div>
           <div className="topbar-context" aria-label="Current location">
-            <span>LIBRARY</span>
+            <span>Library</span>
             <b>/</b>
-            <strong>PROMPT LIBRARY</strong>
+            <strong>Prompt Library</strong>
           </div>
           <div className="top-actions">
             <button
