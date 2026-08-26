@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { inflateSync } from "node:zlib";
 import { supabase } from "@/lib/supabase";
 import { normaliseAustralianEnglish } from "@/lib/australian-english";
 
@@ -40,11 +41,17 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const encoded = url.searchParams.get("payload") ?? "";
-    if (!encoded) return Response.json({ error: "Missing payload." }, { status: 400 });
+    const compressed = url.searchParams.get("z") ?? "";
+    if (!encoded && !compressed) {
+      return Response.json({ error: "Missing payload." }, { status: 400 });
+    }
 
-    const incoming = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as IncomingPrompt[];
-    if (!Array.isArray(incoming) || incoming.length > 10) {
-      return Response.json({ error: "Payload must contain 1–10 prompts." }, { status: 400 });
+    const jsonText = compressed
+      ? inflateSync(Buffer.from(compressed, "base64url")).toString("utf8")
+      : Buffer.from(encoded, "base64url").toString("utf8");
+    const incoming = JSON.parse(jsonText) as IncomingPrompt[];
+    if (!Array.isArray(incoming) || incoming.length > 25) {
+      return Response.json({ error: "Payload must contain 1–25 prompts." }, { status: 400 });
     }
 
     const { data: existingData, error: readError } = await supabase
