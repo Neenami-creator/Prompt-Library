@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   ChangeEvent,
   CSSProperties,
@@ -1413,13 +1414,15 @@ export default function PromptLibrary() {
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
         <div className="brand-block">
-          <div className="brand-mark" aria-hidden="true">
-            <span />
-          </div>
-          <div>
-            <div className="brand-title">MISSION CONTROL</div>
-            <div className="brand-subtitle">POWERED BY NEENOS</div>
-          </div>
+          <Image
+            className="brand-logo"
+            src="/icons/app-icon-192.png"
+            alt="Custom Prompt Library"
+            width={52}
+            height={52}
+            priority
+          />
+          <div className="brand-title">CUSTOM PROMPT LIBRARY</div>
           <button
             className="sidebar-close"
             onClick={() => setMobileNav(false)}
@@ -1593,11 +1596,18 @@ export default function PromptLibrary() {
             ☰
           </button>
           <div className="mobile-brand">
-            <span className="mini-mark" />
-            <span>NEENOS</span>
+            <Image
+              className="mobile-brand-logo"
+              src="/icons/app-icon-192.png"
+              alt=""
+              width={28}
+              height={28}
+              priority
+            />
+            <span>PROMPT LIBRARY</span>
           </div>
           <div className="topbar-context" aria-label="Current location">
-            <span>MISSION CONTROL</span>
+            <span>LIBRARY</span>
             <b>/</b>
             <strong>CUSTOM PROMPT LIBRARY</strong>
           </div>
@@ -2045,7 +2055,7 @@ export default function PromptLibrary() {
         </section>
 
         <footer className="site-footer">
-          <span>Mission Control · powered by NeenOS</span>
+          <span>Custom Prompt Library</span>
           <span>
             {recoveredCount} recovered · {prompts.length - recoveredCount} rebuilt or added
           </span>
