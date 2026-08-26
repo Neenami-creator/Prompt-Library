@@ -1,18 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Custom Prompt Library · Mission Control powered by NeenOS",
+  applicationName: "Custom Prompt Library",
+  title: "Custom Prompt Library",
   description:
-    "Neen's custom, searchable library of copy-ready prompts.",
+    "Organise, discover and reuse your best AI prompts.",
   other: {
     "codex-preview": "development",
   },
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+      { url: "/icons/app-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/app-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
   appleWebApp: {
     capable: true,
@@ -21,8 +32,11 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = {
-  themeColor: "#111326",
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#08071f",
 };
 
 export default function RootLayout({
