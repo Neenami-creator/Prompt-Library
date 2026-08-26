@@ -1,4 +1,4 @@
-# Custom Prompt Library · Mission Control powered by NeenOS
+# Prompt Library
 
 A standalone Next.js app holding Nina's 463-prompt library. It no longer depends on
 ChatGPT Sites, Cloudflare D1 or any OpenAI infrastructure.

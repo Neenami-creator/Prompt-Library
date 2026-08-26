@@ -1,5 +1,5 @@
 /* ============================================================
-   Custom Prompt Library
+   Prompt Library
    Visual design system v2
    All original brand tokens (navy / purple / gold / paper) are
    preserved and extended. No copy, data or logic lives in this
@@ -171,14 +171,11 @@ textarea:focus-visible,
 
 .brand-logo {
   display: block;
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 13px;
-  box-shadow:
-    0 10px 24px rgba(5, 2, 22, 0.34),
-    0 0 18px rgba(144, 91, 230, 0.24);
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.48));
 }
 
 .brand-title {
@@ -3034,10 +3031,10 @@ mark {
 
   .mobile-brand-logo {
     display: block;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(73, 34, 126, 0.2);
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 7px rgba(139, 92, 246, 0.45));
   }
 
   .top-actions .text-button,

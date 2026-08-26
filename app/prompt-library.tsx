@@ -1186,7 +1186,7 @@ export default function PromptLibrary() {
           `## ${prompt.title}\n\n**Category:** ${titleCaseCategory(prompt.category)}  \n**Tags:** ${prompt.tags.join(", ")}\n\n${prompt.description}\n\n### Prompt\n\n${prompt.promptText}`,
       )
       .join("\n\n---\n\n");
-    download("Custom-Prompt-Library.md", `# Custom Prompt Library\n\n${content}`, "text/markdown");
+    download("Prompt-Library.md", `# Prompt Library\n\n${content}`, "text/markdown");
     setToast("Markdown export downloaded");
   }
 
@@ -1416,13 +1416,13 @@ export default function PromptLibrary() {
         <div className="brand-block">
           <Image
             className="brand-logo"
-            src="/icons/app-icon-192.png"
-            alt="Custom Prompt Library"
-            width={52}
-            height={52}
+            src="/icons/prompt-library-logo.svg"
+            alt="Prompt Library"
+            width={56}
+            height={56}
             priority
           />
-          <div className="brand-title">CUSTOM PROMPT LIBRARY</div>
+          <div className="brand-title">PROMPT LIBRARY</div>
           <button
             className="sidebar-close"
             onClick={() => setMobileNav(false)}
@@ -1598,10 +1598,10 @@ export default function PromptLibrary() {
           <div className="mobile-brand">
             <Image
               className="mobile-brand-logo"
-              src="/icons/app-icon-192.png"
+              src="/icons/prompt-library-logo.svg"
               alt=""
-              width={28}
-              height={28}
+              width={32}
+              height={32}
               priority
             />
             <span>PROMPT LIBRARY</span>
@@ -1609,7 +1609,7 @@ export default function PromptLibrary() {
           <div className="topbar-context" aria-label="Current location">
             <span>LIBRARY</span>
             <b>/</b>
-            <strong>CUSTOM PROMPT LIBRARY</strong>
+            <strong>PROMPT LIBRARY</strong>
           </div>
           <div className="top-actions">
             <button
@@ -1708,7 +1708,7 @@ export default function PromptLibrary() {
         <section className="library-heading">
           <div>
             <p className="eyebrow">YOUR SINGLE SOURCE OF TRUTH</p>
-            <h2>Custom Prompt Library</h2>
+            <h2>Prompt Library</h2>
             <p className="intro">
               Search the full text, save favourites and copy exactly what you need.
             </p>
@@ -2055,7 +2055,7 @@ export default function PromptLibrary() {
         </section>
 
         <footer className="site-footer">
-          <span>Custom Prompt Library</span>
+          <span>Prompt Library</span>
           <span>
             {recoveredCount} recovered · {prompts.length - recoveredCount} rebuilt or added
           </span>
