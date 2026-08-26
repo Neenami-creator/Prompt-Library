@@ -17,7 +17,7 @@ function digest(value: string | null | undefined) {
   return createHash("sha256").update(normalise(value)).digest("hex");
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { data, error } = await supabase
       .from("prompts")
@@ -42,6 +42,40 @@ export async function GET() {
         archived: Boolean(row.archived),
       };
     });
+
+    const url = new URL(request.url);
+    const ids = (url.searchParams.get("ids") ?? "").split("|").filter(Boolean);
+    if (ids.length) {
+      const liveIds = new Set(prompts.map((item) => item.id));
+      return Response.json({
+        count: prompts.length,
+        requested: ids.length,
+        present: ids.filter((id) => liveIds.has(id)),
+        missing: ids.filter((id) => !liveIds.has(id)),
+      });
+    }
+
+    const titles = (url.searchParams.get("titles") ?? "").split("|").filter(Boolean).map(normalise);
+    if (titles.length) {
+      const matches = titles.map((key) => ({
+        key,
+        matches: prompts
+          .filter((item) => item.titleKey === key || item.aliases.includes(key))
+          .map((item) => ({ id: item.id, title: item.title, promptHash: item.promptHash })),
+      }));
+      return Response.json({ count: prompts.length, requested: titles.length, matches });
+    }
+
+    const hashes = (url.searchParams.get("hashes") ?? "").split("|").filter(Boolean);
+    if (hashes.length) {
+      const matches = hashes.map((hash) => ({
+        hash,
+        matches: prompts
+          .filter((item) => item.promptHash === hash)
+          .map((item) => ({ id: item.id, title: item.title })),
+      }));
+      return Response.json({ count: prompts.length, requested: hashes.length, matches });
+    }
 
     return Response.json({ count: prompts.length, prompts });
   } catch (error) {
