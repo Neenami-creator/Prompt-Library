@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
+import "./menu-viewport-fix.css";
 
 export const metadata: Metadata = {
   applicationName: "Prompt Library",
