@@ -243,11 +243,22 @@ textarea:focus-visible,
 }
 
 .nav-label {
+  position: relative;
   padding: 4px 12px 9px;
   color: #9189a7;
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.17em;
+}
+
+.nav-label::after {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-2));
 }
 
 .category-nav button {
@@ -328,11 +339,14 @@ textarea:focus-visible,
   align-items: center;
   gap: 9px;
   width: 100%;
+  border: 0;
   border-radius: 11px;
   padding: 8px 11px;
   background: transparent;
   color: #e8e4ee;
+  font: inherit;
   text-align: left;
+  cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
 
@@ -354,18 +368,6 @@ textarea:focus-visible,
   color: white;
 }
 
-/* The label button spans the dot/name/count grid cells of the header via
-   `display: contents`, so it stays a single click target for filtering
-   without disturbing the header's own grid layout. */
-.nav-group-label {
-  display: contents;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 .nav-group-dot {
   width: 8px;
   height: 8px;
@@ -381,21 +383,27 @@ textarea:focus-visible,
   white-space: nowrap;
 }
 
-.nav-chevron-button {
+.nav-chevron {
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
   color: #a79bc0;
-  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
 }
 
-.nav-chevron-button:hover {
-  background: rgba(255, 255, 255, 0.12);
+.nav-group.is-expanded .nav-chevron {
+  transform: rotate(180deg);
   color: #fff;
+}
+
+.nav-view-all {
+  font-weight: 700;
+  color: #e8e4ee !important;
+}
+
+.nav-view-all span {
+  color: inherit;
 }
 
 .nav-chevron {
@@ -409,10 +417,21 @@ textarea:focus-visible,
 }
 
 .nav-subcategories {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-med) var(--ease);
+}
+
+.nav-group.is-expanded .nav-subcategories {
+  grid-template-rows: 1fr;
+}
+
+.nav-subcategories > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 2px 0 6px 17px;
+  overflow: hidden;
 }
 
 .nav-subcategories button {
@@ -697,6 +716,35 @@ textarea:focus-visible,
 
 .text-button:hover {
   color: var(--purple-700);
+}
+
+.command-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: white;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.command-trigger:hover {
+  border-color: var(--purple-500);
+  color: var(--purple-700);
+}
+
+.command-trigger kbd {
+  border-radius: 5px;
+  padding: 2px 6px;
+  background: var(--purple-50);
+  color: var(--purple-700);
+  font-size: 10px;
+  font-weight: 800;
+  font-family: inherit;
 }
 
 .subtle-button {
@@ -1327,7 +1375,7 @@ textarea:focus-visible,
   top: 78px;
   z-index: 15;
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) auto auto;
+  grid-template-columns: minmax(280px, 1fr) auto auto auto;
   gap: 12px;
   align-items: center;
   margin-bottom: 22px;
@@ -1424,6 +1472,38 @@ textarea:focus-visible,
   background: white;
   font-size: 11px;
   font-weight: 700;
+}
+
+.select-toggle {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  padding: 0 16px;
+  background: white;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.select-toggle:hover {
+  border-color: var(--purple-500);
+}
+
+.select-toggle.active {
+  border-color: var(--purple-700);
+  background: var(--purple-700);
+  color: white;
+}
+
+.fuzzy-hint {
+  margin: -8px 0 4px;
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 
 /* ============================================================
@@ -1553,6 +1633,55 @@ textarea:focus-visible,
   font-weight: 800;
   letter-spacing: 0.03em;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.card-checkbox {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.card-checkbox.checked {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #3a2604;
+}
+
+.drag-handle {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  z-index: 2;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  cursor: grab;
+}
+
+.prompt-card.is-selected {
+  border-color: var(--purple-600);
+  box-shadow: 0 0 0 3px rgba(113, 64, 166, 0.22);
+}
+
+.prompt-card.is-dragging {
+  opacity: 0.5;
+}
+
+mark {
+  border-radius: 3px;
+  padding: 0 1px;
+  background: rgba(200, 169, 75, 0.38);
+  color: inherit;
 }
 
 .card-body {
@@ -1691,6 +1820,27 @@ textarea:focus-visible,
 
 .card-footer button:hover span {
   transform: translate(2px, -2px);
+}
+
+.card-footer button.copy-success {
+  color: #1f8a4c;
+  animation: copy-pulse 320ms var(--ease);
+}
+
+@keyframes copy-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.load-more-sentinel {
+  height: 1px;
 }
 
 .skeleton-card {
@@ -2597,6 +2747,158 @@ textarea:focus-visible,
 }
 
 /* ============================================================
+   Bulk-select action bar
+   ============================================================ */
+
+.bulk-bar {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 48px));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 10px 12px 10px 20px;
+  background: #21162c;
+  color: white;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  font-weight: 700;
+  animation: toast-in var(--dur-med) var(--ease) both;
+}
+
+.bulk-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-bar-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bulk-bar-actions button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.bulk-bar-actions button:disabled {
+  opacity: 0.5;
+}
+
+.bulk-bar-actions button.subtle-button {
+  background: transparent;
+  color: #c9c2d4;
+}
+
+/* ============================================================
+   Command palette
+   ============================================================ */
+
+.command-layer {
+  align-items: flex-start;
+  padding-top: min(14vh, 140px);
+}
+
+.command-palette {
+  width: min(560px, 100%);
+  max-height: min(60vh, 480px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-lg);
+  background: #1b1530;
+  box-shadow: var(--shadow);
+  animation: modal-in var(--dur-med) var(--ease) both;
+}
+
+.command-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a79bc0;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.command-input-row input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: white;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.command-input-row input::placeholder {
+  color: #756a8c;
+}
+
+.command-results {
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.command-results button {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: transparent;
+  color: #e8e4ee;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.command-results button small {
+  color: #a79bc0;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.command-results button b {
+  min-width: 22px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c9c2d4;
+  font-size: 10px;
+  text-align: center;
+}
+
+.command-results button.active,
+.command-results button:hover {
+  background: linear-gradient(90deg, rgba(84, 37, 127, 0.9), rgba(104, 53, 154, 0.65));
+  color: white;
+}
+
+.command-empty {
+  padding: 20px 12px;
+  color: #a79bc0;
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* ============================================================
    Toast
    ============================================================ */
 
@@ -2679,7 +2981,7 @@ textarea:focus-visible,
    Responsive — iPad (portrait + landscape)
    ============================================================ */
 
-@media (max-width: 1024px) and (min-width: 861px) {
+@media (max-width: 1024px) and (min-width: 701px) {
   .sidebar {
     width: 240px;
   }
@@ -2705,7 +3007,7 @@ textarea:focus-visible,
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 700px) {
   .sidebar {
     transform: translateX(-105%);
     transition: transform var(--dur-med) var(--ease);
@@ -2806,6 +3108,10 @@ textarea:focus-visible,
   .search-box {
     grid-column: 1 / -1;
   }
+
+  .select-toggle {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ============================================================
@@ -2824,6 +3130,15 @@ textarea:focus-visible,
   .top-actions .primary-button {
     padding: 9px 12px;
     font-size: 11px;
+  }
+
+  .command-trigger-label,
+  .command-trigger kbd {
+    display: none;
+  }
+
+  .command-trigger {
+    padding: 9px 10px;
   }
 
   /* The portrait sits in its own reserved band at the foot of the hero, so the
@@ -2958,7 +3273,8 @@ textarea:focus-visible,
 
   .search-box,
   .sort-control select,
-  .filter-chip {
+  .filter-chip,
+  .select-toggle {
     min-height: 46px;
   }
 

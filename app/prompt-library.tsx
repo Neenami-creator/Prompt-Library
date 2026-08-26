@@ -3,8 +3,10 @@
 import {
   ChangeEvent,
   CSSProperties,
+  DragEvent,
   FormEvent,
   KeyboardEvent,
+  RefObject,
   useEffect,
   useMemo,
   useRef,
@@ -298,6 +300,100 @@ function getAdelaideGreeting(date: Date) {
   return "Good evening";
 }
 
+type PaletteItem = {
+  kind: "prompt" | "category" | "action";
+  id: string;
+  label: string;
+  hint?: string;
+  count?: number;
+  run: () => void;
+};
+
+/**
+ * Cheap subsequence-based fuzzy match: every character of `term` must appear
+ * in `text`, in order, but not necessarily adjacent. Returns -1 for no match,
+ * otherwise a score that rewards tight, early, consecutive matches so the
+ * closest typo-tolerant results float to the top.
+ */
+function fuzzyScore(text: string, term: string): number {
+  const t = text.toLowerCase();
+  const q = term.toLowerCase();
+  if (!q) return -1;
+  let cursor = 0;
+  let score = 0;
+  let streak = 0;
+  for (const char of q) {
+    const found = t.indexOf(char, cursor);
+    if (found === -1) return -1;
+    streak = found === cursor ? streak + 1 : 0;
+    score += 3 + streak;
+    cursor = found + 1;
+  }
+  return score;
+}
+
+/** Wraps every case-insensitive occurrence of `term` in `text` with <mark>. */
+function highlightMatches(text: string, term: string) {
+  const trimmed = term.trim();
+  if (!trimmed) return text;
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "ig"));
+  if (parts.length === 1) return text;
+  return parts.map((part, index) =>
+    part.toLowerCase() === trimmed.toLowerCase() ? (
+      <mark key={index}>{part}</mark>
+    ) : (
+      <span key={index}>{part}</span>
+    ),
+  );
+}
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Traps Tab/Shift+Tab focus inside a modal while it's open, focuses the first
+ * focusable element on open, and returns focus to whatever triggered the
+ * modal once it closes — so keyboard users never get dropped outside the
+ * dialog or lose their place in the page underneath it.
+ */
+function useFocusTrap(active: boolean, containerRef: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    if (!active) return;
+    const container = containerRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const focusFirst = () => {
+      const focusable = container?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      (focusable?.[0] ?? container)?.focus();
+    };
+    const raf = window.requestAnimationFrame(focusFirst);
+
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Tab" || !container) return;
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((el) => el.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [active, containerRef]);
+}
+
 export default function PromptLibrary() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [audit, setAudit] = useState<Audit | null>(null);
@@ -325,13 +421,84 @@ export default function PromptLibrary() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [review, setReview] = useState<ReviewItem[] | null>(null);
   const [applying, setApplying] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+  const [commandIndex, setCommandIndex] = useState(0);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkWorking, setBulkWorking] = useState(false);
+  const [favoriteOrder, setFavoriteOrder] = useState<string[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(60);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const browseRef = useRef<HTMLElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const commandInputRef = useRef<HTMLInputElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const detailModalRef = useRef<HTMLElement>(null);
+  const formModalRef = useRef<HTMLElement>(null);
+  const profileModalRef = useRef<HTMLElement>(null);
+  const reviewModalRef = useRef<HTMLElement>(null);
+  const auditModalRef = useRef<HTMLElement>(null);
+  const statsModalRef = useRef<HTMLElement>(null);
+  const commandModalRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     void loadPrompts();
     void loadProfile();
+  }, []);
+
+  // Restore last-used filter/sort/view and favourite ordering from a previous
+  // visit, so returning to the app resumes exactly where you left off.
+  useEffect(() => {
+    try {
+      const rawFilters = window.localStorage.getItem("promptLibrary:filters");
+      if (rawFilters) {
+        const parsed = JSON.parse(rawFilters) as {
+          category?: string;
+          sort?: string;
+          libraryView?: LibraryView;
+        };
+        if (parsed.category) setCategory(parsed.category);
+        if (parsed.sort) setSort(parsed.sort);
+        if (parsed.libraryView) setLibraryView(parsed.libraryView);
+      }
+      const rawOrder = window.localStorage.getItem("promptLibrary:favoriteOrder");
+      if (rawOrder) setFavoriteOrder(JSON.parse(rawOrder) as string[]);
+    } catch {
+      // Corrupt or inaccessible storage — fall back to defaults silently.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "promptLibrary:filters",
+        JSON.stringify({ category, sort, libraryView }),
+      );
+    } catch {
+      // Best-effort only — never block the UI on storage failures.
+    }
+  }, [category, sort, libraryView]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("promptLibrary:favoriteOrder", JSON.stringify(favoriteOrder));
+    } catch {
+      // Best-effort only.
+    }
+  }, [favoriteOrder]);
+
+  // Registers a service worker (production only) so the app shell can be
+  // installed and reopened even without a network connection.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Offline support is a nice-to-have — never surface this to the user.
+    });
   }, []);
 
   useEffect(() => {
@@ -346,6 +513,101 @@ export default function PromptLibrary() {
     const timer = window.setInterval(refreshGreeting, 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Renders results incrementally instead of all at once — a lighter-weight
+  // substitute for full list virtualization that needs no extra dependency
+  // and keeps the existing card grid layout untouched.
+  useEffect(() => {
+    setVisibleCount(60);
+  }, [search, category, sort, libraryView]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setVisibleCount((count) => count + 60);
+      },
+      { rootMargin: "800px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [visibleCount]);
+
+  useEffect(() => {
+    if (commandOpen) {
+      setCommandQuery("");
+      setCommandIndex(0);
+    }
+  }, [commandOpen]);
+
+  // Global keyboard shortcuts: Cmd/Ctrl+K for the command palette, Escape to
+  // close whichever modal is topmost, "/" to jump into search, and
+  // arrow/f/c for navigating and acting on a focused prompt card.
+  useEffect(() => {
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const isTyping = Boolean(
+        target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName),
+      );
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen((open) => !open);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (commandOpen) setCommandOpen(false);
+        else if (review) setReview(null);
+        else if (form) setForm(null);
+        else if (profileForm) setProfileForm(null);
+        else if (selected) setSelected(null);
+        else if (statsOpen) setStatsOpen(false);
+        else if (auditOpen) setAuditOpen(false);
+        return;
+      }
+
+      if (isTyping || commandOpen) return;
+
+      if (event.key === "/") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      const card = target?.closest?.(".prompt-card") as HTMLElement | null;
+      if (!card) return;
+      const cards = Array.from(document.querySelectorAll<HTMLElement>(".prompt-card"));
+      const index = cards.indexOf(card);
+
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        event.preventDefault();
+        cards[index + 1]?.focus();
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        event.preventDefault();
+        cards[index - 1]?.focus();
+      } else if (event.key.toLowerCase() === "f") {
+        const id = card.dataset.promptId;
+        const prompt = prompts.find((item) => item.id === id);
+        if (prompt) void toggleFavourite(prompt);
+      } else if (event.key.toLowerCase() === "c") {
+        const id = card.dataset.promptId;
+        const prompt = prompts.find((item) => item.id === id);
+        if (prompt) void copyPrompt(prompt);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [commandOpen, review, form, profileForm, selected, statsOpen, auditOpen, prompts]);
+
+  useFocusTrap(Boolean(selected), detailModalRef);
+  useFocusTrap(Boolean(form), formModalRef);
+  useFocusTrap(Boolean(profileForm), profileModalRef);
+  useFocusTrap(Boolean(review), reviewModalRef);
+  useFocusTrap(auditOpen, auditModalRef);
+  useFocusTrap(statsOpen, statsModalRef);
+  useFocusTrap(commandOpen, commandModalRef);
 
   async function loadPrompts() {
     try {
@@ -442,17 +704,22 @@ export default function PromptLibrary() {
     return result;
   }, [prompts]);
 
+  function matchesActiveScope(prompt: Prompt) {
+    const matchesCategory =
+      category === "all" ||
+      (category === "favorites" && prompt.favorite) ||
+      (category.startsWith("group:")
+        ? groupKeyFor(prompt.category) === category.slice(6)
+        : prompt.category === category);
+    if (!matchesCategory) return false;
+    if (libraryView === "featured" && !prompt.featured) return false;
+    return true;
+  }
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const result = prompts.filter((prompt) => {
-      const matchesCategory =
-        category === "all" ||
-        (category === "favorites" && prompt.favorite) ||
-        (category.startsWith("group:")
-          ? groupKeyFor(prompt.category) === category.slice(6)
-          : prompt.category === category);
-      if (!matchesCategory) return false;
-      if (libraryView === "featured" && !prompt.featured) return false;
+      if (!matchesActiveScope(prompt)) return false;
       if (!term) return true;
       return [
         prompt.title,
@@ -475,7 +742,47 @@ export default function PromptLibrary() {
       if (sort === "copied") return b.copyCount - a.copyCount;
       return Number(b.featured) - Number(a.featured) || a.title.localeCompare(b.title);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prompts, category, search, sort, libraryView]);
+
+  /**
+   * When the exact substring search comes up empty, fall back to a
+   * typo-tolerant subsequence match on title/tags rather than showing
+   * nothing — this is what makes a slightly misspelled search still useful.
+   */
+  const fuzzyMatches = useMemo(() => {
+    const term = search.trim();
+    if (term.length < 2 || filtered.length > 0) return [];
+    return prompts
+      .filter((prompt) => matchesActiveScope(prompt))
+      .map((prompt) => ({
+        prompt,
+        score: fuzzyScore(`${prompt.title} ${prompt.tags.join(" ")}`, term),
+      }))
+      .filter((entry) => entry.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.prompt)
+      .slice(0, 40);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prompts, search, category, libraryView, filtered.length]);
+
+  const usingFuzzy = filtered.length === 0 && fuzzyMatches.length > 0;
+  const baseResults = usingFuzzy ? fuzzyMatches : filtered;
+
+  /** Applies your manual favourites ordering (drag-to-reorder) when browsing favourites. */
+  const orderedResults = useMemo(() => {
+    if (category !== "favorites" || !favoriteOrder.length) return baseResults;
+    const orderIndex = new Map(favoriteOrder.map((id, index) => [id, index]));
+    return [...baseResults].sort((a, b) => {
+      const ai = orderIndex.has(a.id) ? (orderIndex.get(a.id) as number) : Number.MAX_SAFE_INTEGER;
+      const bi = orderIndex.has(b.id) ? (orderIndex.get(b.id) as number) : Number.MAX_SAFE_INTEGER;
+      return ai - bi;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseResults, favoriteOrder, category]);
+
+  const visiblePrompts = orderedResults.slice(0, visibleCount);
+  const hasMore = orderedResults.length > visiblePrompts.length;
 
   /**
    * What the person is actually reaching for, derived entirely from the
@@ -676,6 +983,98 @@ export default function PromptLibrary() {
     }
   }
 
+  function toggleSelectMode() {
+    setSelectMode((value) => !value);
+    setSelectedIds([]);
+  }
+
+  function toggleSelectId(id: string) {
+    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]));
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
+  /** Sets favourite status on every selected prompt via the existing PATCH endpoint — no new API. */
+  async function bulkSetFavourite(next: boolean) {
+    if (!selectedIds.length) return;
+    setBulkWorking(true);
+    const ids = [...selectedIds];
+    setPrompts((items) =>
+      items.map((item) => (ids.includes(item.id) ? { ...item, favorite: next } : item)),
+    );
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch("/api/prompts", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, favorite: next }),
+          }),
+        ),
+      );
+      setToast(
+        next
+          ? `Added ${ids.length} prompt${ids.length === 1 ? "" : "s"} to favourites`
+          : `Removed ${ids.length} prompt${ids.length === 1 ? "" : "s"} from favourites`,
+      );
+    } catch {
+      setToast("Some favourites could not be saved.");
+      void loadPrompts();
+    } finally {
+      setBulkWorking(false);
+      clearSelection();
+    }
+  }
+
+  function bulkExportSelected() {
+    if (!selectedIds.length) return;
+    const chosen = prompts.filter((prompt) => selectedIds.includes(prompt.id));
+    const content = JSON.stringify(
+      chosen.map(
+        ({ id, title, category: promptCategory, tags, description, promptText, aliases, favorite }) => ({
+          id,
+          title,
+          category: promptCategory,
+          tags,
+          description,
+          promptText,
+          aliases,
+          favorite,
+        }),
+      ),
+      null,
+      2,
+    );
+    download(`Prompt-Library-Selection-${chosen.length}.json`, content, "application/json");
+    setToast(`Exported ${chosen.length} selected prompt${chosen.length === 1 ? "" : "s"}`);
+  }
+
+  function handleFavouriteDragStart(id: string) {
+    setDragId(id);
+  }
+
+  function handleFavouriteDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+  }
+
+  function handleFavouriteDrop(targetId: string) {
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      return;
+    }
+    setFavoriteOrder((current) => {
+      const base = current.length ? current : orderedResults.map((prompt) => prompt.id);
+      const withoutDragged = base.filter((id) => id !== dragId);
+      const targetIndex = withoutDragged.indexOf(targetId);
+      const next = [...withoutDragged];
+      next.splice(targetIndex === -1 ? next.length : targetIndex, 0, dragId);
+      return next;
+    });
+    setDragId(null);
+  }
+
   function openEdit(prompt: Prompt) {
     setSelected(null);
     setForm({
@@ -785,6 +1184,72 @@ export default function PromptLibrary() {
     download("Custom-Prompt-Library.md", `# Custom Prompt Library\n\n${content}`, "text/markdown");
     setToast("Markdown export downloaded");
   }
+
+  const paletteResults = useMemo<PaletteItem[]>(() => {
+    const term = commandQuery.trim().toLowerCase();
+
+    const quickActions: PaletteItem[] = [
+      { kind: "action", id: "add", label: "Add a new prompt", run: () => setForm(emptyForm) },
+      { kind: "action", id: "all", label: "Show all prompts", run: () => openAllPrompts() },
+      { kind: "action", id: "favourites", label: "Show favourites", run: () => selectCategory("favorites") },
+      { kind: "action", id: "featured", label: "Show featured prompts", run: () => openFeaturedPrompts() },
+      { kind: "action", id: "stats", label: "Open usage stats", run: () => setStatsOpen(true) },
+      { kind: "action", id: "audit", label: "Open consolidation audit", run: () => setAuditOpen(true) },
+      { kind: "action", id: "export-json", label: "Export library as JSON", run: () => exportJson() },
+      { kind: "action", id: "export-md", label: "Export library as Markdown", run: () => exportMarkdown() },
+      {
+        kind: "action",
+        id: "select",
+        label: selectMode ? "Turn off multi-select" : "Select multiple prompts",
+        run: () => toggleSelectMode(),
+      },
+    ];
+
+    const categoryActions: PaletteItem[] = categoryGroups
+      .filter((group) => categories.some((item) => groupKeyFor(item) === group.key))
+      .map((group) => {
+        const groupCategories = categories.filter((item) => groupKeyFor(item) === group.key);
+        const count = groupCategories.reduce((sum, item) => sum + (counts[item] ?? 0), 0);
+        return {
+          kind: "category" as const,
+          id: `group:${group.key}`,
+          label: `Category: ${group.label}`,
+          count,
+          run: () => selectCategory(`group:${group.key}`),
+        };
+      });
+
+    const promptActions: PaletteItem[] = term
+      ? prompts
+          .map((prompt) => ({
+            prompt,
+            score: Math.max(
+              `${prompt.title} ${prompt.tags.join(" ")}`.toLowerCase().includes(term) ? 999 : -1,
+              fuzzyScore(prompt.title, term),
+            ),
+          }))
+          .filter((entry) => entry.score >= 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 8)
+          .map(({ prompt }) => ({
+            kind: "prompt" as const,
+            id: prompt.id,
+            label: prompt.title,
+            hint: titleCaseCategory(prompt.category),
+            run: () => {
+              setSelected(prompt);
+              setCommandOpen(false);
+            },
+          }))
+      : [];
+
+    if (!term) return [...promptActions, ...quickActions, ...categoryActions].slice(0, 10);
+
+    const matchingActions = [...quickActions, ...categoryActions].filter((item) =>
+      item.label.toLowerCase().includes(term),
+    );
+    return [...promptActions, ...matchingActions].slice(0, 10);
+  }, [commandQuery, prompts, categories, counts, selectMode]);
 
   /**
    * Reads an import file and checks every prompt in it against the library
@@ -961,7 +1426,7 @@ export default function PromptLibrary() {
         </div>
 
         <nav className="category-nav" aria-label="Prompt categories">
-          <div className="nav-label">LIBRARY</div>
+          <h2 className="nav-label">LIBRARY</h2>
           <button
             className={category === "all" ? "active" : ""}
             onClick={() => selectCategory("all")}
@@ -977,7 +1442,7 @@ export default function PromptLibrary() {
             <b>{counts.favorites ?? 0}</b>
           </button>
 
-          <div className="nav-label nav-label-groups">CATEGORIES</div>
+          <h2 className="nav-label nav-label-groups">CATEGORIES</h2>
           {categoryGroups.map((group) => {
             const groupCategories = categories.filter((item) => groupKeyFor(item) === group.key);
             if (!groupCategories.length) return null;
@@ -1003,37 +1468,30 @@ export default function PromptLibrary() {
             const isGroupActive = category === `group:${group.key}`;
             return (
               <div className={`nav-group ${isExpanded ? "is-expanded" : ""}`} key={group.key}>
-                <div
+                <button
+                  type="button"
                   className={`nav-group-header ${isGroupActive ? "is-active" : ""}`}
                   style={{ "--accent": group.accent } as CSSProperties}
+                  onClick={() => toggleGroup(group.key)}
+                  aria-expanded={isExpanded}
+                  aria-label={
+                    isExpanded ? `Collapse ${group.label} subcategories` : `Expand ${group.label} subcategories`
+                  }
                 >
-                  <button
-                    type="button"
-                    className="nav-group-label"
-                    onClick={() => {
-                      selectCategory(`group:${group.key}`);
-                      setExpandedGroup(group.key);
-                    }}
-                    aria-label={`Show all ${group.label} prompts`}
-                  >
-                    <span className="nav-group-dot" aria-hidden="true" />
-                    <span>{group.label}</span>
-                    <b>{groupCount}</b>
-                  </button>
-                  <button
-                    type="button"
-                    className="nav-chevron-button"
-                    onClick={() => toggleGroup(group.key)}
-                    aria-expanded={isExpanded}
-                    aria-label={
-                      isExpanded ? `Collapse ${group.label} subcategories` : `Expand ${group.label} subcategories`
-                    }
-                  >
-                    <span className="nav-chevron" aria-hidden="true">⌄</span>
-                  </button>
-                </div>
-                {isExpanded && (
-                  <div className="nav-subcategories">
+                  <span className="nav-group-dot" aria-hidden="true" />
+                  <span>{group.label}</span>
+                  <b>{groupCount}</b>
+                  <span className="nav-chevron" aria-hidden="true">⌄</span>
+                </button>
+                <div className="nav-subcategories">
+                  <div>
+                    <button
+                      className={`nav-view-all ${isGroupActive ? "active" : ""}`}
+                      onClick={() => selectCategory(`group:${group.key}`)}
+                    >
+                      <span>View all {group.label}</span>
+                      <b>{groupCount}</b>
+                    </button>
                     {groupCategories.map((item) => (
                       <button
                         key={item}
@@ -1045,19 +1503,33 @@ export default function PromptLibrary() {
                       </button>
                     ))}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
         </nav>
 
         <div className="sidebar-audit">
-          <div className="nav-label">LIBRARY STATUS</div>
+          <h2 className="nav-label">LIBRARY STATUS</h2>
           <button onClick={() => setAuditOpen(true)} className="audit-summary">
             <span className="status-dot" />
             <span>
               <strong>{prompts.length} prompts secured</strong>
               <small>View consolidation audit</small>
+            </span>
+            <span aria-hidden="true">›</span>
+          </button>
+          <button
+            onClick={() => {
+              setStatsOpen(true);
+              setMobileNav(false);
+            }}
+            className="audit-summary"
+          >
+            <span className="status-dot" />
+            <span>
+              <strong>Usage stats</strong>
+              <small>What you&apos;re actually using</small>
             </span>
             <span aria-hidden="true">›</span>
           </button>
@@ -1126,6 +1598,16 @@ export default function PromptLibrary() {
             <strong>CUSTOM PROMPT LIBRARY</strong>
           </div>
           <div className="top-actions">
+            <button
+              type="button"
+              className="command-trigger"
+              onClick={() => setCommandOpen(true)}
+              aria-label="Open command palette"
+            >
+              <span aria-hidden="true">⌕</span>
+              <span className="command-trigger-label">Quick search</span>
+              <kbd aria-hidden="true">⌘K</kbd>
+            </button>
             <span className="topbar-greeting">
               {greeting}, {profileName}
             </span>
@@ -1359,9 +1841,10 @@ export default function PromptLibrary() {
                 <label className="search-box">
                   <span aria-hidden="true">⌕</span>
                   <input
+                    ref={searchInputRef}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search titles, prompt text, tags or aliases…"
+                    placeholder="Search titles, prompt text, tags or aliases… (press /)"
                     aria-label="Search prompt library"
                   />
                   {search && (
@@ -1376,7 +1859,7 @@ export default function PromptLibrary() {
                     : category === "all"
                       ? "Every category"
                       : labels[category] ?? category}
-                  <strong>{filtered.length}</strong>
+                  <strong>{orderedResults.length}</strong>
                 </div>
                 <label className="sort-control">
                   <span>Sort</span>
@@ -1387,7 +1870,21 @@ export default function PromptLibrary() {
                     <option value="copied">Most copied</option>
                   </select>
                 </label>
+                <button
+                  type="button"
+                  className={`select-toggle ${selectMode ? "active" : ""}`}
+                  onClick={toggleSelectMode}
+                  aria-pressed={selectMode}
+                >
+                  {selectMode ? "Done selecting" : "Select"}
+                </button>
               </section>
+
+              {usingFuzzy && (
+                <p className="fuzzy-hint">
+                  No exact match — showing close results for “{search.trim()}”.
+                </p>
+              )}
 
               {error && (
                 <section className="error-panel">
@@ -1414,71 +1911,115 @@ export default function PromptLibrary() {
                     </div>
                   ))}
                 </section>
-              ) : filtered.length ? (
-                <section className="prompt-grid" aria-label="Prompt results">
-                  {filtered.map((prompt) => (
-                    <article
-                      className={`prompt-card ${prompt.featured ? "featured" : ""}`}
-                      data-category={prompt.category}
-                      key={prompt.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelected(prompt)}
-                      onKeyDown={(event) => handleCardKey(event, prompt)}
-                    >
-                      <div
-                        className="card-art"
-                        aria-hidden="true"
-                        style={{ "--accent": accentFor(prompt.category) } as CSSProperties}
+              ) : visiblePrompts.length ? (
+                <>
+                  <section className="prompt-grid" aria-label="Prompt results">
+                    {visiblePrompts.map((prompt, index) => (
+                      <article
+                        className={`prompt-card ${prompt.featured ? "featured" : ""} ${
+                          selectMode && selectedIds.includes(prompt.id) ? "is-selected" : ""
+                        } ${dragId === prompt.id ? "is-dragging" : ""}`}
+                        data-category={prompt.category}
+                        data-prompt-id={prompt.id}
+                        key={prompt.id}
+                        role="button"
+                        tabIndex={0}
+                        style={{ animationDelay: `${Math.min(index, 14) * 30}ms` } as CSSProperties}
+                        draggable={category === "favorites" && !selectMode}
+                        onDragStart={() => handleFavouriteDragStart(prompt.id)}
+                        onDragOver={handleFavouriteDragOver}
+                        onDrop={() => handleFavouriteDrop(prompt.id)}
+                        onClick={() =>
+                          selectMode ? toggleSelectId(prompt.id) : setSelected(prompt)
+                        }
+                        onKeyDown={(event) => handleCardKey(event, prompt)}
                       >
-                        {prompt.featured && <span className="card-featured-flag">★ Featured</span>}
-                      </div>
-                      <div className="card-body">
-                        <div className="card-topline">
+                        {selectMode && (
                           <span
-                            className="category-pill"
-                            style={{ "--accent": accentFor(prompt.category) } as CSSProperties}
+                            className={`card-checkbox ${selectedIds.includes(prompt.id) ? "checked" : ""}`}
+                            aria-hidden="true"
                           >
-                            {titleCaseCategory(prompt.category)}
+                            {selectedIds.includes(prompt.id) ? "✓" : ""}
                           </span>
-                          <button
-                            className={`star-button ${prompt.favorite ? "is-favourite" : ""}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void toggleFavourite(prompt);
-                            }}
-                            aria-label={
-                              prompt.favorite ? "Remove from favourites" : "Add to favourites"
-                            }
-                          >
-                            {prompt.favorite ? "★" : "☆"}
-                          </button>
+                        )}
+                        <div
+                          className="card-art"
+                          aria-hidden="true"
+                          style={{ "--accent": accentFor(prompt.category) } as CSSProperties}
+                        >
+                          {prompt.featured && <span className="card-featured-flag">★ Featured</span>}
+                          {category === "favorites" && !selectMode && (
+                            <span className="drag-handle" aria-hidden="true">⠿</span>
+                          )}
                         </div>
-                        <h2>{prompt.title}</h2>
-                        <p>{prompt.description}</p>
-                        <div className="tag-row">
-                          {prompt.tags.slice(0, 3).map((tag) => (
-                            <span key={tag}>{tag}</span>
-                          ))}
-                          {prompt.tags.length > 3 && <span>+{prompt.tags.length - 3}</span>}
+                        <div className="card-body">
+                          <div className="card-topline">
+                            <span
+                              className="category-pill"
+                              style={{ "--accent": accentFor(prompt.category) } as CSSProperties}
+                            >
+                              {titleCaseCategory(prompt.category)}
+                            </span>
+                            <button
+                              className={`star-button ${prompt.favorite ? "is-favourite" : ""}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void toggleFavourite(prompt);
+                              }}
+                              aria-label={
+                                prompt.favorite ? "Remove from favourites" : "Add to favourites"
+                              }
+                            >
+                              {prompt.favorite ? "★" : "☆"}
+                            </button>
+                          </div>
+                          <h2>
+                            {usingFuzzy || !search
+                              ? prompt.title
+                              : highlightMatches(prompt.title, search)}
+                          </h2>
+                          <p>
+                            {usingFuzzy || !search
+                              ? prompt.description
+                              : highlightMatches(prompt.description, search)}
+                          </p>
+                          <div className="tag-row">
+                            {prompt.tags.slice(0, 3).map((tag) => (
+                              <span key={tag}>{tag}</span>
+                            ))}
+                            {prompt.tags.length > 3 && <span>+{prompt.tags.length - 3}</span>}
+                          </div>
+                          <div className="card-footer">
+                            <span>
+                              {prompt.copyCount ? `${prompt.copyCount} copies` : "Ready to use"}
+                            </span>
+                            <button
+                              className={copiedId === prompt.id ? "copy-success" : ""}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void copyPrompt(prompt);
+                                setCopiedId(prompt.id);
+                                window.setTimeout(
+                                  () => setCopiedId((id) => (id === prompt.id ? null : id)),
+                                  1400,
+                                );
+                              }}
+                            >
+                              {copiedId === prompt.id ? (
+                                <>Copied ✓</>
+                              ) : (
+                                <>
+                                  Copy prompt <span aria-hidden="true">↗</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
-                        <div className="card-footer">
-                          <span>
-                            {prompt.copyCount ? `${prompt.copyCount} copies` : "Ready to use"}
-                          </span>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void copyPrompt(prompt);
-                            }}
-                          >
-                            Copy prompt <span aria-hidden="true">↗</span>
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </section>
+                      </article>
+                    ))}
+                  </section>
+                  {hasMore && <div ref={loadMoreRef} className="load-more-sentinel" aria-hidden="true" />}
+                </>
               ) : (
                 <section className="empty-state">
                   <span className="empty-state-mark" aria-hidden="true">⌕</span>
@@ -1511,6 +2052,7 @@ export default function PromptLibrary() {
         <div className="modal-layer" role="presentation" onMouseDown={() => setSelected(null)}>
           <section
             className="detail-modal"
+            ref={detailModalRef as RefObject<HTMLElement>}
             role="dialog"
             aria-modal="true"
             aria-labelledby="prompt-detail-title"
@@ -1582,6 +2124,9 @@ export default function PromptLibrary() {
         <div className="modal-layer" role="presentation" onMouseDown={() => setProfileForm(null)}>
           <form
             className="form-modal form-modal--narrow"
+            ref={(node) => {
+              profileModalRef.current = node;
+            }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="profile-form-title"
@@ -1641,6 +2186,9 @@ export default function PromptLibrary() {
         <div className="modal-layer" role="presentation" onMouseDown={() => setForm(null)}>
           <form
             className="form-modal"
+            ref={(node) => {
+              formModalRef.current = node;
+            }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="prompt-form-title"
@@ -1734,6 +2282,7 @@ export default function PromptLibrary() {
         <div className="modal-layer" role="presentation" onMouseDown={() => setReview(null)}>
           <section
             className="review-modal"
+            ref={reviewModalRef as RefObject<HTMLElement>}
             role="dialog"
             aria-modal="true"
             aria-labelledby="review-title"
@@ -1886,6 +2435,7 @@ export default function PromptLibrary() {
         <div className="modal-layer audit-layer" role="presentation" onMouseDown={() => setAuditOpen(false)}>
           <aside
             className="audit-drawer"
+            ref={auditModalRef as RefObject<HTMLElement>}
             role="dialog"
             aria-modal="true"
             aria-labelledby="audit-title"
@@ -1982,6 +2532,7 @@ export default function PromptLibrary() {
         >
           <aside
             className="audit-drawer"
+            ref={statsModalRef as RefObject<HTMLElement>}
             role="dialog"
             aria-modal="true"
             aria-labelledby="stats-title"
@@ -2105,6 +2656,90 @@ export default function PromptLibrary() {
               </>
             )}
           </aside>
+        </div>
+      )}
+
+      {selectMode && selectedIds.length > 0 && (
+        <div className="bulk-bar" role="toolbar" aria-label="Bulk actions">
+          <span>{selectedIds.length} selected</span>
+          <div className="bulk-bar-actions">
+            <button disabled={bulkWorking} onClick={() => void bulkSetFavourite(true)}>
+              ★ Favourite
+            </button>
+            <button disabled={bulkWorking} onClick={() => void bulkSetFavourite(false)}>
+              ☆ Unfavourite
+            </button>
+            <button disabled={bulkWorking} onClick={bulkExportSelected}>
+              Export selected
+            </button>
+            <button className="subtle-button" onClick={clearSelection}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {commandOpen && (
+        <div
+          className="modal-layer command-layer"
+          role="presentation"
+          onMouseDown={() => setCommandOpen(false)}
+        >
+          <div
+            className="command-palette"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+            ref={commandModalRef as RefObject<HTMLDivElement>}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="command-input-row">
+              <span aria-hidden="true">⌘K</span>
+              <input
+                ref={commandInputRef}
+                value={commandQuery}
+                onChange={(event) => {
+                  setCommandQuery(event.target.value);
+                  setCommandIndex(0);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setCommandIndex((index) => Math.min(index + 1, paletteResults.length - 1));
+                  } else if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setCommandIndex((index) => Math.max(index - 1, 0));
+                  } else if (event.key === "Enter") {
+                    event.preventDefault();
+                    paletteResults[commandIndex]?.run();
+                  }
+                }}
+                placeholder="Search prompts, categories, or actions…"
+                aria-label="Command palette search"
+              />
+            </div>
+            <div className="command-results" role="listbox">
+              {paletteResults.length ? (
+                paletteResults.map((item, index) => (
+                  <button
+                    key={`${item.kind}-${item.id}`}
+                    type="button"
+                    role="option"
+                    aria-selected={index === commandIndex}
+                    className={index === commandIndex ? "active" : ""}
+                    onMouseEnter={() => setCommandIndex(index)}
+                    onClick={() => item.run()}
+                  >
+                    <span>{item.label}</span>
+                    {item.hint && <small>{item.hint}</small>}
+                    {typeof item.count === "number" && <b>{item.count}</b>}
+                  </button>
+                ))
+              ) : (
+                <p className="command-empty">No matches. Try a different word.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -8,10 +8,21 @@ export const metadata: Metadata = {
   other: {
     "codex-preview": "development",
   },
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Prompt Library",
+  },
+};
+
+export const viewport = {
+  themeColor: "#111326",
 };
 
 export default function RootLayout({
