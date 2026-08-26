@@ -1,0 +1,17 @@
+{
+  "name": "Custom Prompt Library · Mission Control",
+  "short_name": "Prompt Library",
+  "description": "Neen's custom, searchable library of copy-ready prompts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111326",
+  "theme_color": "#111326",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
