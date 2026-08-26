@@ -67,7 +67,7 @@ body {
     radial-gradient(circle at -5% 40%, rgba(200, 169, 75, 0.07), transparent 28rem),
     var(--paper);
   color: var(--ink);
-  font-family: Aptos, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-geist-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -192,10 +192,8 @@ textarea:focus-visible,
   line-height: 1.05;
   font-weight: 700;
   letter-spacing: -0.025em;
-  background: linear-gradient(120deg, #ffffff, #d9c3f2 65%, var(--gold-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--gold-2);
+  text-shadow: 0 2px 14px rgba(226, 196, 111, 0.16);
 }
 
 .sidebar-close {
@@ -598,6 +596,7 @@ textarea:focus-visible,
   min-height: 78px;
   align-items: center;
   justify-content: space-between;
+  font-family: var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
   border-bottom: 1px solid var(--line);
   background: rgba(247, 245, 242, 0.82);
   backdrop-filter: blur(14px);
@@ -607,20 +606,22 @@ textarea:focus-visible,
 .topbar-context {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
   color: #8d8494;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .topbar-context b {
   color: var(--gold);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .topbar-context strong {
   color: #655c6e;
+  font-weight: 650;
 }
 
 .top-actions {
@@ -684,6 +685,7 @@ textarea:focus-visible,
   background: transparent;
   color: var(--ink-soft);
   font-size: 12px;
+  font-weight: 600;
 }
 
 .text-button:hover {
@@ -700,7 +702,7 @@ textarea:focus-visible,
   background: white;
   color: var(--ink-soft);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   transition: border-color var(--dur-fast) var(--ease);
 }
 
@@ -843,7 +845,7 @@ textarea:focus-visible,
 .mission-hero h1 {
   margin: 0;
   color: #18131e;
-  font-family: Aptos, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
   font-size: clamp(42px, 5vw, 70px);
   font-weight: 400;
   letter-spacing: -0.055em;
@@ -2077,7 +2079,7 @@ mark {
   margin: 0;
   padding: 20px;
   color: #342b3b;
-  font-family: Aptos, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
   font-size: 12.5px;
   line-height: 1.65;
   white-space: pre-wrap;
@@ -2691,14 +2693,6 @@ mark {
   border-radius: 999px;
 }
 
-.topbar-greeting {
-  margin-right: 2px;
-  color: var(--ink-soft);
-  font-size: 11.5px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .source-groups {
   margin: 24px 0;
 }
@@ -3053,7 +3047,6 @@ mark {
   }
 
   .top-actions .text-button,
-  .topbar-greeting,
   .export-menu {
     display: none;
   }

@@ -1624,9 +1624,6 @@ export default function PromptLibrary() {
               <span className="command-trigger-label">Quick search</span>
               <kbd aria-hidden="true">⌘K</kbd>
             </button>
-            <span className="topbar-greeting">
-              {greeting}, {profileName}
-            </span>
             <button className="text-button" onClick={() => setStatsOpen(true)}>
               Usage stats
             </button>
