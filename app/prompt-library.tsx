@@ -7,6 +7,7 @@ import {
   FormEvent,
   KeyboardEvent,
   RefObject,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -436,7 +437,6 @@ export default function PromptLibrary() {
   const browseRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const commandInputRef = useRef<HTMLInputElement>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
   const detailModalRef = useRef<HTMLElement>(null);
   const formModalRef = useRef<HTMLElement>(null);
   const profileModalRef = useRef<HTMLElement>(null);
@@ -521,18 +521,22 @@ export default function PromptLibrary() {
     setVisibleCount(60);
   }, [search, category, sort, libraryView]);
 
-  useEffect(() => {
-    const node = loadMoreRef.current;
+  const loadMoreObserverRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    loadMoreObserverRef.current?.disconnect();
     if (!node) return;
-    const observer = new IntersectionObserver(
+    // Created once per sentinel mount (not on every visibleCount change) —
+    // recreating this on each increment made it re-fire immediately in a
+    // tight cascade on large libraries, since the sentinel is almost always
+    // already within the rootMargin.
+    loadMoreObserverRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) setVisibleCount((count) => count + 60);
       },
-      { rootMargin: "800px" },
+      { rootMargin: "300px" },
     );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [visibleCount]);
+    loadMoreObserverRef.current.observe(node);
+  }, []);
 
   useEffect(() => {
     if (commandOpen) {
