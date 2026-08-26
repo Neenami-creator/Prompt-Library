@@ -203,9 +203,76 @@ source = source.replace(
             .map((group) => {`,
 );
 
+// Personalise the gold sidebar title with the saved user name.
+source = source.replace(
+  '<div className="brand-title">Prompt Library</div>',
+  '<div className="brand-title">{profileName}&apos;s Prompt Library</div>',
+);
+
+// Simplify the top breadcrumb to a single location label.
+source = source.replace(
+  /<div className="topbar-context" aria-label="Current location">[\s\S]*?<\/div>\s*<div className="top-actions">/,
+  `<div className="topbar-context" aria-label="Current location">
+            <strong>Prompt Library</strong>
+          </div>
+          <div className="top-actions">`,
+);
+
 if (!source.includes('label: "Finance"') || !source.includes('label: "Travel"') || !source.includes('label: "Home & Interiors"')) {
   throw new Error("Category navigation refresh did not apply cleanly.");
 }
+if (!source.includes("{profileName}&apos;s Prompt Library") || !source.includes('<strong>Prompt Library</strong>')) {
+  throw new Error("Personalised chrome refresh did not apply cleanly.");
+}
 
 writeFileSync(file, source);
-console.log("[navigation] category architecture refreshed");
+
+const cssFile = join(process.cwd(), "app/globals.css");
+let css = readFileSync(cssFile, "utf8");
+const marker = "/* Personalised navigation alignment refresh */";
+if (!css.includes(marker)) {
+  css += `\n\n${marker}\n
+/* Reserve identical columns for every parent category so counts and
+   dropdown chevrons form clean vertical lines. */
+.category-nav .nav-group-header,
+.category-nav button.nav-solo-group {
+  grid-template-columns: 8px minmax(0, 1fr) 38px 22px;
+  column-gap: 9px;
+}
+
+.category-nav button.nav-solo-group::after {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.category-nav .nav-group-header b,
+.category-nav button.nav-solo-group b {
+  width: 38px;
+  min-width: 38px;
+  justify-self: end;
+}
+
+.brand-title {
+  max-width: 164px;
+  font-size: 16.5px;
+  line-height: 1.12;
+}
+
+.hero-greeting {
+  font-size: clamp(18px, 1.45vw, 24px) !important;
+  line-height: 1.2 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.015em !important;
+  text-transform: none !important;
+}
+
+.topbar-context strong {
+  font-weight: 700;
+}
+`;
+  writeFileSync(cssFile, css);
+}
+
+console.log("[navigation] category architecture and personalised chrome refreshed");
