@@ -1,0 +1,37 @@
+/* Viewport-safe sizing for all top-bar drawers and menus.
+   Keeps the drawer inside the usable screen on desktop, iPad and phones,
+   and lets long menu content scroll within the drawer rather than being
+   pushed above the viewport. */
+
+.audit-layer {
+  align-items: stretch;
+  overflow: hidden;
+  min-height: 100dvh;
+  height: 100dvh;
+}
+
+.audit-drawer {
+  min-height: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-top: max(30px, env(safe-area-inset-top));
+  padding-bottom: max(30px, env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+
+@supports not (height: 100dvh) {
+  .audit-layer,
+  .audit-drawer {
+    height: 100vh;
+  }
+}
+
+@media (max-width: 720px) {
+  .audit-drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+}
