@@ -227,7 +227,7 @@ if (!source.includes("promptLibrary:personalPrompts")) {
     setToast("Removed from my library");
   }
 
-  function exportJson`,
+  async function exportJson`,
   );
 
   source = source.replace(
