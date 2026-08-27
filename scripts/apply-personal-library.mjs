@@ -204,7 +204,7 @@ if (!source.includes("promptLibrary:personalPrompts")) {
   );
 
   source = source.replace(
-    /  async function archivePrompt\(prompt: Prompt\) \{[\s\S]*?\n  \}\n\n  function exportJson/,
+    /  async function archivePrompt\(prompt: Prompt\) \{[\s\S]*?\n  \}\n\n  async function exportJson/,
     `  async function archivePrompt(prompt: Prompt) {
     if (prompt.id.startsWith("local-")) {
       const personal = readJson<Prompt[]>(PERSONAL_PROMPTS_KEY, []).filter(
