@@ -270,4 +270,330 @@ html[data-theme="dark"] .export-popover button:hover {
   writeFileSync(cssFile, css);
 }
 
+
+/* Dark mode repair: comprehensive component coverage */
+const repairMarker = "/* Midnight Aubergine repair pass */";
+if (!css.includes(repairMarker)) {
+  css += `\n\n${repairMarker}
+
+/* Re-map the core design tokens only while dark mode is active. Light mode
+   remains exactly as authored above. */
+html[data-theme="dark"] {
+  --ink: #f6eff8;
+  --ink-soft: #c6b8cf;
+  --ink-faint: #9f90aa;
+  --paper: #160b1e;
+  --line: #432f50;
+  --line-strong: #5a406a;
+  --purple-50: #251330;
+  --purple-100: #30183e;
+  --purple-800: #f2e7f7;
+  --purple-700: #d4afe9;
+  --purple-600: #ba7dde;
+  --white: #21112c;
+}
+
+/* Search / filter toolbar */
+html[data-theme="dark"] .control-panel {
+  border-color: #49345a;
+  background: rgba(33, 17, 44, 0.94);
+  box-shadow: 0 10px 32px rgba(5, 2, 9, 0.28);
+}
+
+html[data-theme="dark"] .search-box {
+  border-color: #49345a;
+  background: #190d22;
+}
+
+html[data-theme="dark"] .search-box:focus-within {
+  border-color: #9c63c5;
+  background: #1d1027;
+}
+
+html[data-theme="dark"] .search-box input {
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  color: #f6eff8;
+  caret-color: #e2c46f;
+}
+
+html[data-theme="dark"] .search-box input::placeholder {
+  color: #9f90aa;
+}
+
+html[data-theme="dark"] .search-box > span {
+  color: #c58ae6;
+}
+
+html[data-theme="dark"] .filter-chip {
+  background: #311a40;
+  color: #eadcf2;
+}
+
+html[data-theme="dark"] .filter-chip strong {
+  background: #4a2760;
+  color: #fff6d8;
+}
+
+html[data-theme="dark"] .sort-control {
+  color: #c6b8cf;
+}
+
+html[data-theme="dark"] .sort-control select,
+html[data-theme="dark"] .select-toggle {
+  border-color: #4a365a;
+  background: #190d22;
+  color: #f4edf7;
+}
+
+html[data-theme="dark"] .select-toggle:hover {
+  border-color: #a36bc8;
+}
+
+/* Main headings and statistics */
+html[data-theme="dark"] .library-heading h2,
+html[data-theme="dark"] .directory-heading h2,
+html[data-theme="dark"] .category-directory h2,
+html[data-theme="dark"] .empty-state h2,
+html[data-theme="dark"] .view-heading h2 {
+  color: #f4eaf8;
+}
+
+html[data-theme="dark"] .intro,
+html[data-theme="dark"] .directory-heading p:last-child,
+html[data-theme="dark"] .view-heading p:last-child,
+html[data-theme="dark"] .fuzzy-hint {
+  color: #c6b8cf;
+}
+
+html[data-theme="dark"] .heading-stats button {
+  border-color: #432f50;
+  background: #21112c;
+  color: #f4edf7;
+}
+
+html[data-theme="dark"] .heading-stats button:hover,
+html[data-theme="dark"] .heading-stats button.active {
+  border-color: #735087;
+  background: #2a1638;
+}
+
+html[data-theme="dark"] .heading-stats strong {
+  color: #f5e8fa;
+}
+
+html[data-theme="dark"] .heading-stats span {
+  color: #bdaec6;
+}
+
+html[data-theme="dark"] .heading-stats small,
+html[data-theme="dark"] .eyebrow {
+  color: #d3a8e8;
+}
+
+/* Category directory */
+html[data-theme="dark"] .category-directory {
+  border-color: #432f50;
+  background: rgba(29, 15, 39, 0.92);
+}
+
+html[data-theme="dark"] .category-directory-grid button {
+  border-color: #49345a;
+  background: linear-gradient(120deg, #24122f, #1c0f25 68%);
+  color: #f4edf7;
+}
+
+html[data-theme="dark"] .category-directory-grid small {
+  color: #b8a9c2;
+}
+
+html[data-theme="dark"] .category-directory-grid b {
+  color: #d7afe9;
+}
+
+/* Prompt cards — titles are H2, not H3. */
+html[data-theme="dark"] .prompt-card {
+  border-color: #432f50;
+  background: #21112c;
+}
+
+html[data-theme="dark"] .prompt-card h2 {
+  color: #f7f0fa;
+}
+
+html[data-theme="dark"] .card-body > p {
+  color: #c4b6cc;
+}
+
+html[data-theme="dark"] .category-pill {
+  background: #2c1739;
+  color: #eadcf2;
+  box-shadow: 0 4px 12px rgba(4, 1, 8, 0.34);
+}
+
+html[data-theme="dark"] .star-button {
+  background: #2b1737;
+  color: #c5b4ce;
+  box-shadow: 0 4px 12px rgba(4, 1, 8, 0.34);
+}
+
+html[data-theme="dark"] .star-button:hover {
+  background: #3a2148;
+  color: var(--gold-2);
+}
+
+html[data-theme="dark"] .tag-row span,
+html[data-theme="dark"] .detail-tags span,
+html[data-theme="dark"] .source-chip-grid span {
+  border-color: #4a365a;
+  background: #291634;
+  color: #cdbfd5;
+}
+
+html[data-theme="dark"] .card-footer {
+  border-top-color: #432f50;
+}
+
+html[data-theme="dark"] .card-footer > span {
+  color: #9f90aa;
+}
+
+html[data-theme="dark"] .card-footer button {
+  color: #d5afe9;
+}
+
+/* Skeletons and feedback states */
+html[data-theme="dark"] .skeleton-card,
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .error-panel {
+  border-color: #432f50;
+  background: #21112c;
+}
+
+html[data-theme="dark"] .skeleton-art {
+  background: linear-gradient(100deg, #2b1737 20%, #3a2148 40%, #2b1737 60%) 0 0 / 220% 100%;
+}
+
+html[data-theme="dark"] .skeleton-line {
+  background: linear-gradient(100deg, #2a1835 20%, #3b2448 40%, #2a1835 60%) 0 0 / 220% 100%;
+}
+
+html[data-theme="dark"] .empty-state p {
+  color: #bdaec6;
+}
+
+/* Prompt detail and all modal surfaces */
+html[data-theme="dark"] .detail-modal,
+html[data-theme="dark"] .form-modal,
+html[data-theme="dark"] .review-modal {
+  border-color: #4c365c;
+  background: #180c21;
+  color: #f4edf7;
+}
+
+html[data-theme="dark"] .detail-modal > header,
+html[data-theme="dark"] .form-modal > header,
+html[data-theme="dark"] .review-modal > header,
+html[data-theme="dark"] .audit-drawer > header {
+  border-bottom-color: #432f50;
+  background: radial-gradient(circle at 96% -10%, rgba(135, 73, 177, 0.2), transparent 18rem), #21112c;
+}
+
+html[data-theme="dark"] .detail-modal h2,
+html[data-theme="dark"] .form-modal h2,
+html[data-theme="dark"] .review-modal h2,
+html[data-theme="dark"] .audit-drawer h2 {
+  color: #f5eaf9;
+}
+
+html[data-theme="dark"] .detail-modal header p,
+html[data-theme="dark"] .review-intro,
+html[data-theme="dark"] .profile-form-note {
+  color: #c3b5cb;
+}
+
+html[data-theme="dark"] .close-button,
+html[data-theme="dark"] .secondary-button,
+html[data-theme="dark"] .subtle-button {
+  border-color: #4a365a;
+  background: #25132f;
+  color: #e9ddf0;
+}
+
+html[data-theme="dark"] .close-button:hover,
+html[data-theme="dark"] .secondary-button:hover,
+html[data-theme="dark"] .subtle-button:hover {
+  border-color: #9b64c2;
+  color: #fff6d8;
+}
+
+html[data-theme="dark"] .prompt-text {
+  border-color: #49345a;
+  background: #130919;
+}
+
+html[data-theme="dark"] .prompt-label {
+  border-bottom-color: #432f50;
+  background: linear-gradient(90deg, #2b1737, #21112c);
+  color: #d5afe9;
+}
+
+html[data-theme="dark"] .prompt-text pre {
+  background: #130919;
+  color: #f0e8f4;
+}
+
+html[data-theme="dark"] .detail-modal footer,
+html[data-theme="dark"] .form-modal footer,
+html[data-theme="dark"] .review-modal footer {
+  border-top-color: #432f50;
+}
+
+/* Forms, reviews, audit and stats */
+html[data-theme="dark"] .form-grid label > span,
+html[data-theme="dark"] .review-item strong,
+html[data-theme="dark"] .stats-card strong,
+html[data-theme="dark"] .usage-card strong {
+  color: #f2e9f6;
+}
+
+html[data-theme="dark"] .review-item,
+html[data-theme="dark"] .stats-card,
+html[data-theme="dark"] .usage-card {
+  border-color: #432f50;
+  background: #21112c;
+}
+
+html[data-theme="dark"] .review-description,
+html[data-theme="dark"] .review-item p,
+html[data-theme="dark"] .stats-card p,
+html[data-theme="dark"] .usage-card p {
+  color: #c2b4ca;
+}
+
+html[data-theme="dark"] .audit-drawer {
+  background: #180c21;
+}
+
+/* Top quick links and general small text */
+html[data-theme="dark"] .category-links button small {
+  color: #a998b4;
+}
+
+html[data-theme="dark"] .site-footer {
+  color: #9f90aa;
+}
+
+/* Avoid a bright flash when changing theme and keep native widgets legible. */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] button {
+  color-scheme: dark;
+}
+`;
+  writeFileSync(cssFile, css);
+}
+
 console.log("[theme] optional Midnight Aubergine dark mode applied");
