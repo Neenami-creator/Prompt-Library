@@ -311,7 +311,8 @@ if (!source.includes("promptLibrary:personalPrompts")) {
     storage: source.includes("promptLibrary:personalPrompts"),
     remove: source.includes("Removed from my library"),
     photo: source.includes("Photo updated on this device"),
-    merge: source.includes("mergePersonalLibrary"),\n    usage: source.includes("promptLibrary:usageEvents") && !source.includes('incrementCopy: true'),
+    merge: source.includes("mergePersonalLibrary"),
+    usage: source.includes("promptLibrary:usageEvents") && !source.includes("incrementCopy: true"),
   };
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
   if (failed.length) {
