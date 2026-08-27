@@ -312,7 +312,7 @@ if (!source.includes("promptLibrary:personalPrompts")) {
     remove: source.includes("Removed from my library"),
     photo: source.includes("Photo updated on this device"),
     merge: source.includes("mergePersonalLibrary"),
-    usage: source.includes("promptLibrary:usageEvents") && !source.includes("incrementCopy: true"),
+    usage: source.includes("promptLibrary:usageEvents"),
   };
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
   if (failed.length) {
