@@ -153,7 +153,7 @@ if (!source.includes("promptLibrary:personalPrompts")) {
       const personal = prompts.filter((prompt) => prompt.id.startsWith("local-"));
 
       const personalPrompt: Prompt = {
-        id: existing?.id.startsWith("local-") ? existing.id : `local-${crypto.randomUUID()}`,
+        id: existing?.id.startsWith("local-") ? existing.id : "local-" + crypto.randomUUID(),
         title: form.title.trim(),
         category: form.category.trim().toLowerCase() || "uncategorised",
         tags: listFromText(form.tags),
