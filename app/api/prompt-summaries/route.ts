@@ -1,6 +1,6 @@
 import { supabase, type PromptRow } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 const SUMMARY_COLUMNS =
   "id,title,category,tags_json,description,source,recovery_status,aliases_json,featured,favorite,archived,copy_count,last_copied_at,created_at,updated_at";
@@ -59,7 +59,9 @@ export async function GET() {
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "public, max-age=0, must-revalidate",
+          "CDN-Cache-Control": "max-age=60, stale-while-revalidate=300",
+          "Vercel-CDN-Cache-Control": "max-age=60, stale-while-revalidate=300",
         },
       },
     );
