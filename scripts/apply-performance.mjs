@@ -17,7 +17,7 @@ if (!source.includes("promptDetailCacheRef")) {
 
   source = source.replace(
     '      setPrompts(data.prompts ?? []);\n      setAudit(data.audit ?? null);\n      setError("");',
-    '      setPrompts(data.prompts ?? []);\n      setAudit(data.audit ?? null);\n      setError("");\n      fullLibraryDataRef.current = null;\n      fullLibraryRequestRef.current = null;\n      window.setTimeout(() => { void hydrateFullLibrary(); }, 3500);',
+    '      setPrompts(data.prompts ?? []);\n      setAudit(data.audit ?? null);\n      setError("");\n      fullLibraryDataRef.current = null;\n      fullLibraryRequestRef.current = null;\n      window.setTimeout(() => { void hydrateFullLibrary(); }, 1200);',
   );
 
   source = source.replace(
