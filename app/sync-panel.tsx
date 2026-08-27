@@ -13,6 +13,7 @@ const SYNC_KEYS = [
   "promptLibrary:filters",
   "promptLibrary:favoriteOrder",
   "promptLibrary:theme",
+  "promptLibrary:usageEvents",
 ] as const;
 
 type SyncState = Record<string, string>;
@@ -75,6 +76,10 @@ function mergeStates(local: SyncState, cloud: SyncState): SyncState {
   result["promptLibrary:personalPrompts"] = mergePromptArrays(
     local["promptLibrary:personalPrompts"],
     cloud["promptLibrary:personalPrompts"],
+  );
+  result["promptLibrary:usageEvents"] = mergePromptArrays(
+    local["promptLibrary:usageEvents"],
+    cloud["promptLibrary:usageEvents"],
   );
   for (const key of [
     "promptLibrary:hiddenPromptIds",
