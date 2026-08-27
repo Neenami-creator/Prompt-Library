@@ -197,20 +197,24 @@ export default function SyncPanel() {
 
   useEffect(() => {
     if (!user) return;
-    let timer: number | null = null;
-    const schedule = () => {
+    let lastSnapshot = JSON.stringify(readLocalState());
+    const checkForChanges = () => {
       if (!readyRef.current) return;
-      if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => void pushState(user), 900);
+      const nextSnapshot = JSON.stringify(readLocalState());
+      if (nextSnapshot === lastSnapshot) return;
+      lastSnapshot = nextSnapshot;
+      void pushState(user);
     };
-    window.addEventListener("prompt-library-local-change", schedule);
-    window.addEventListener("visibilitychange", schedule);
-    window.addEventListener("beforeunload", schedule);
+
+    const interval = window.setInterval(checkForChanges, 4000);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") checkForChanges();
+    };
+    window.addEventListener("visibilitychange", onVisibility);
+
     return () => {
-      if (timer) window.clearTimeout(timer);
-      window.removeEventListener("prompt-library-local-change", schedule);
-      window.removeEventListener("visibilitychange", schedule);
-      window.removeEventListener("beforeunload", schedule);
+      window.clearInterval(interval);
+      window.removeEventListener("visibilitychange", onVisibility);
     };
   }, [user]);
 
