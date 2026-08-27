@@ -288,13 +288,15 @@ if (!source.includes("promptLibrary:personalPrompts")) {
     '<button type="button" className="avatar-change-link" onClick={openProfileEdit}>\n                Edit name\n              </button>\n              {hiddenPromptIds.length > 0 && (<>\n                <span aria-hidden="true">·</span>\n                <button type="button" className="avatar-change-link" onClick={restoreHiddenPrompts}>Restore prompts</button>\n              </>)}',
   );
 
-  if (
-    !source.includes("promptLibrary:personalPrompts") ||
-    !source.includes("Removed from my library") ||
-    !source.includes("Photo updated on this device") ||
-    !source.includes("mergePersonalLibrary")
-  ) {
-    throw new Error("Local personal-library transform did not apply cleanly.");
+  const checks = {
+    storage: source.includes("promptLibrary:personalPrompts"),
+    remove: source.includes("Removed from my library"),
+    photo: source.includes("Photo updated on this device"),
+    merge: source.includes("mergePersonalLibrary"),
+  };
+  const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+  if (failed.length) {
+    throw new Error(`Local personal-library transform did not apply cleanly: ${failed.join(", ")}`);
   }
 
   writeFileSync(file, source);
