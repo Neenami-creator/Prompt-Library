@@ -21,7 +21,7 @@ if (!source.includes("promptLibrary:personalPrompts")) {
   const HIDDEN_PROMPTS_KEY = "promptLibrary:hiddenPromptIds";
   const FAVOURITES_KEY = "promptLibrary:favourites";
   const PROFILE_KEY = "promptLibrary:profile";
-  const AVATAR_KEY = "promptLibrary:avatar";
+  const AVATAR_KEY = "promptLibrary:avatar";\n  const USAGE_EVENTS_KEY = "promptLibrary:usageEvents";
 
   function readJson<T>(key: string, fallback: T): T {
     try {
@@ -44,11 +44,30 @@ if (!source.includes("promptLibrary:personalPrompts")) {
     const personal = readJson<Prompt[]>(PERSONAL_PROMPTS_KEY, []);
     const hidden = new Set(readJson<string[]>(HIDDEN_PROMPTS_KEY, []));
     const favourites = new Set(readJson<string[]>(FAVOURITES_KEY, []));
+    const usageEvents = readJson<{ id: string; promptId: string; at: string }[]>(USAGE_EVENTS_KEY, []);
+    const usage = new Map<string, { copyCount: number; lastCopiedAt: string | null }>();
+
+    for (const event of usageEvents) {
+      if (!event?.promptId || !event?.at) continue;
+      const current = usage.get(event.promptId) ?? { copyCount: 0, lastCopiedAt: null };
+      current.copyCount += 1;
+      if (!current.lastCopiedAt || event.at > current.lastCopiedAt) current.lastCopiedAt = event.at;
+      usage.set(event.promptId, current);
+    }
+
+    const applyPersonalState = (prompt: Prompt) => {
+      const stats = usage.get(prompt.id);
+      return {
+        ...prompt,
+        favorite: favourites.has(prompt.id) || (prompt.id.startsWith("local-") && prompt.favorite),
+        copyCount: stats?.copyCount ?? 0,
+        lastCopiedAt: stats?.lastCopiedAt ?? null,
+      };
+    };
+
     return [
-      ...master
-        .filter((prompt) => !hidden.has(prompt.id))
-        .map((prompt) => ({ ...prompt, favorite: favourites.has(prompt.id) })),
-      ...personal.map((prompt) => ({ ...prompt, favorite: favourites.has(prompt.id) || prompt.favorite })),
+      ...master.filter((prompt) => !hidden.has(prompt.id)).map(applyPersonalState),
+      ...personal.map(applyPersonalState),
     ];
   }
 
@@ -292,7 +311,7 @@ if (!source.includes("promptLibrary:personalPrompts")) {
     storage: source.includes("promptLibrary:personalPrompts"),
     remove: source.includes("Removed from my library"),
     photo: source.includes("Photo updated on this device"),
-    merge: source.includes("mergePersonalLibrary"),
+    merge: source.includes("mergePersonalLibrary"),\n    usage: source.includes("promptLibrary:usageEvents") && !source.includes('incrementCopy: true'),
   };
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
   if (failed.length) {
