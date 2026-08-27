@@ -1,6 +1,6 @@
 import { supabase, PROMPT_COLUMNS, type PromptRow } from "@/lib/supabase";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 function parseList(value: string) {
   try {
@@ -49,7 +49,7 @@ export async function GET(
 
     return Response.json(
       { prompt: data ? serialise(data as PromptRow) : null },
-      { headers: { "Cache-Control": "private, max-age=30" } },
+      { headers: { "Cache-Control": "public, max-age=0, must-revalidate", "CDN-Cache-Control": "max-age=30", "Vercel-CDN-Cache-Control": "max-age=30" } },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
