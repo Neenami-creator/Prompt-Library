@@ -1,6 +1,6 @@
 # Prompt Library
 
-A standalone Next.js app holding Nina's 463-prompt library. It no longer depends on
+A standalone Next.js app holding Nina's 485-prompt library. It no longer depends on
 ChatGPT Sites, Cloudflare D1 or any OpenAI infrastructure.
 
 **Live:** https://neenos-prompt-library.vercel.app
@@ -18,7 +18,7 @@ ChatGPT Sites, Cloudflare D1 or any OpenAI infrastructure.
 
 ### Tables
 
-- **`prompts`** — the library. 463 rows. Every edit, favourite, archive and copy-count
+- **`prompts`** — the library. 485 rows. Every edit, favourite, archive and copy-count
   made in the app writes here, so changes persist.
 - **`assets`** — the 17 custom icons plus the avatar, stored base64. Served by
   `/api/icon/[file]`, which `next.config.ts` maps back onto the original
@@ -67,9 +67,9 @@ npm run reseal
 
 ---
 
-## Two things worth knowing
+## One thing worth knowing
 
-### 1. There is no login
+### There is no login
 
 Anyone who has the URL can read, edit, add and archive prompts. This mirrors how the
 original ChatGPT Sites app worked — its API was open too — so nothing got *less* safe in
@@ -81,27 +81,32 @@ without signing in or share with someone else.
 If you'd rather have a real login later, Supabase Auth plus tightened row-level security
 policies is the natural next step.
 
-### 2. Eleven prompts were already cut off before the migration
+---
 
-These eleven arrived from the ChatGPT Sites export with the literal marker
-`[truncated for model]` in the prompt body, each around 2,000 characters — the export
-itself clipped them. They were migrated exactly as found; nothing was lost or altered
-here, but the endings are missing and would need to be pasted back in from wherever the
-originals live:
+## Changelog
 
-1. Complete Brand Strategy Blueprint
-2. Create My Personalised AI Money Map
-3. Expert Newsletter Strategist
-4. Gallery-Quality Graphite Dog Portrait
-5. Luxury Visual Identity Designer
-6. Master Graphite Fashion Portrait & Artist's Workspace
-7. Master Prompt — Product Infographic Generator
-8. Premium Brand Naming System
-9. Pro Songwriting Assistant
-10. Redesign an Existing Page Without Changing Content or Functionality
-11. Ultimate Text Summariser
+### 2026-08-29 — Library audit and curation pass
 
-Search the library for `truncated` to find them.
+- **Fixed: the eleven prompts cut off during the original migration.** These had arrived
+  from the ChatGPT Sites export with the literal marker `[truncated for model]` in the
+  prompt body. All eleven have since been rebuilt with complete, natural endings and are
+  marked `recovery_status = 'rebuilt'` in the database: Complete Brand Strategy Blueprint,
+  Create My Personalised AI Money Map, Expert Newsletter Strategist, Gallery-Quality
+  Graphite Dog Portrait, Luxury Visual Identity Designer, Master Graphite Fashion Portrait
+  & Artist's Workspace, Master Prompt — Product Infographic Generator, Premium Brand
+  Naming System, Pro Songwriting Assistant, Redesign an Existing Page Without Changing
+  Content or Functionality, Ultimate Text Summariser. No prompt in the library shows the
+  truncation marker any more.
+- **Recategorised 77 prompts** to fix a taxonomy that had drifted as the library grew:
+  pulled 6 astrology/spirituality prompts out of "productivity & organisation" (their own
+  category now), folded the tool-named "gemini" category into "dashboards & data
+  visualisation", consolidated three separate NotebookLM categories into one, consolidated
+  a "faceless content" theme that had been scattered across four different categories,
+  and cleaned up several other thin or overlapping categories. 35 categories became 28.
+- **Removed 40 archived prompts** that had been sitting invisible in the app (an old
+  "essentials" quick-command set and a batch of additional image-generation techniques).
+  None duplicated anything in the active library, so a backup of their content was kept
+  before deletion.
 
 ---
 
